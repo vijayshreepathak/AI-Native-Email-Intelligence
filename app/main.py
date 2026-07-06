@@ -2,54 +2,51 @@
 
 from __future__ import annotations
 
-import sys
 import time
-import traceback
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
-# --- bootstrap: validate env and import dependencies with visible tracebacks ---
-try:
-    from app.startup_validation import validate_production_env
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
 
-    validate_production_env()
-
-    from fastapi import Depends, FastAPI, HTTPException
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import ORJSONResponse
-
-    from app import __version__
-    from app.auth.clerk import get_current_user_id
-    from app.config import get_settings
-    from app.db.database import database_enabled, init_db
-    from app.graph import get_full_graph, get_generate_graph, get_predict_graph
-    from app.retriever.vector_store import get_vector_store
-    from app.schemas import (
-        DashboardResponse,
-        EmailInput,
-        EvaluateRequest,
-        EvaluateResponse,
-        GenerateResponse,
-        PredictRequest,
-        PredictResponse,
-    )
-    from app.services.dashboard import get_dashboard_service
-    from app.state import EmailState
-    from app.utils.logger import setup_logging, get_logger
-except Exception:
-    traceback.print_exc()
-    sys.exit(1)
+from . import __version__
+from .auth.clerk import get_current_user_id
+from .config import get_settings
+from .db.database import init_db
+from .graph import get_full_graph, get_generate_graph, get_predict_graph
+from .retriever.vector_store import get_vector_store
+from .schemas import (
+    DashboardResponse,
+    EmailInput,
+    EvaluateRequest,
+    EvaluateResponse,
+    GenerateResponse,
+    PredictRequest,
+    PredictResponse,
+)
+from .services.dashboard import get_dashboard_service
+from .startup_validation import log_env_diagnostics, validate_production_env
+from .state import EmailState
+from .utils.logger import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application startup and shutdown — defer heavy init; never crash on optional deps."""
+    """Startup runs after imports succeed; env validation and heavy init happen here."""
     setup_logging()
-    settings = get_settings()
     logger.info("Starting AI Email Intelligence Platform v%s", __version__)
 
+    log_env_diagnostics()
+    try:
+        validate_production_env()
+        logger.info("Environment validation passed")
+    except RuntimeError as exc:
+        logger.error("Environment validation failed: %s", exc)
+
+    settings = get_settings()
     if not settings.has_llm_provider:
         logger.warning("No LLM API key configured — generation endpoints will fail")
 
@@ -114,28 +111,14 @@ def _total_latency(node_metrics: dict[str, Any]) -> float:
 
 @app.get("/")
 async def root() -> dict[str, str]:
-    """Lightweight root probe — no DB, LLM, or auth."""
+    """Lightweight root probe — no external services."""
     return {"status": "ok"}
 
 
 @app.get("/health")
-async def health_check() -> dict[str, Any]:
-    """Render health check — env flags only, no DB/LLM/Chroma calls."""
-    settings = get_settings()
-    return {
-        "status": "healthy",
-        "version": __version__,
-        "model": settings.anthropic_model if settings.anthropic_api_key else settings.gemini_model,
-        "chroma_available": False,
-        "llm_provider": "claude" if settings.anthropic_api_key else ("gemini" if settings.effective_gemini_key else "none"),
-        "fallback_available": bool(settings.effective_gemini_key),
-        "providers": {
-            "anthropic": bool(settings.anthropic_api_key),
-            "gemini": bool(settings.effective_gemini_key),
-            "chromadb": False,
-            "postgresql": database_enabled(),
-        },
-    }
+async def health_check() -> dict[str, str]:
+    """Render health check — no database, LLM, Chroma, or Clerk."""
+    return {"status": "healthy"}
 
 
 @app.post("/predict", response_model=PredictResponse)

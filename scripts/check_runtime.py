@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
-from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:

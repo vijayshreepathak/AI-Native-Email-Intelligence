@@ -3,18 +3,20 @@
 
 import asyncio
 import json
+import os
 import random
 import re
 import sys
 import time
-from pathlib import Path
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 import typer
 from anthropic import AsyncAnthropic
 from rich.console import Console
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import DATASET_DIR, get_settings
 from app.constants import (

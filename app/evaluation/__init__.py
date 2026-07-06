@@ -1,10 +1,10 @@
 """Evaluation package."""
 
-from app.evaluation.bertscore import compute_bertscore
-from app.evaluation.embedding_similarity import compute_embedding_similarity
-from app.evaluation.llm_judge import run_llm_judge
-from app.evaluation.overall_score import aggregate_feedback, compute_overall_score
-from app.evaluation.pipeline import (
+from .bertscore import compute_bertscore
+from .embedding_similarity import compute_embedding_similarity
+from .llm_judge import run_llm_judge
+from .overall_score import aggregate_feedback, compute_overall_score
+from .pipeline import (
     bertscore_node,
     embedding_evaluation_node,
     final_report_node,

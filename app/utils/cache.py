@@ -6,7 +6,7 @@ import time
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from app.config import get_settings
+from ..config import get_settings
 
 F = TypeVar("F", bound=Callable[..., Any])
 

@@ -4,21 +4,21 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
-from app.agents.customer_agent import customer_agent
-from app.agents.generator_agent import generator_agent, prompt_builder
-from app.agents.intent_agent import intent_agent
-from app.agents.judge_agent import judge_agent
-from app.agents.knowledge_agent import knowledge_agent
-from app.agents.priority_agent import priority_agent
-from app.agents.sentiment_agent import sentiment_agent
-from app.agents.validator_agent import validator_agent
-from app.evaluation.pipeline import (
+from .agents.customer_agent import customer_agent
+from .agents.generator_agent import generator_agent, prompt_builder
+from .agents.intent_agent import intent_agent
+from .agents.judge_agent import judge_agent
+from .agents.knowledge_agent import knowledge_agent
+from .agents.priority_agent import priority_agent
+from .agents.sentiment_agent import sentiment_agent
+from .agents.validator_agent import validator_agent
+from .evaluation.pipeline import (
     bertscore_node,
     embedding_evaluation_node,
     final_report_node,
 )
-from app.state import EmailState
-from app.utils.logger import get_logger
+from .state import EmailState
+from .utils.logger import get_logger
 
 logger = get_logger(__name__)
 

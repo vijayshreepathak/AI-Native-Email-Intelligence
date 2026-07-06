@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from app.agents.judge_agent import judge_agent
-from app.models import JudgeScores
-from app.state import EmailState
+from ..agents.judge_agent import judge_agent
+from ..models import JudgeScores
+from ..state import EmailState
 
 
 async def run_llm_judge(state: EmailState) -> dict[str, Any]:

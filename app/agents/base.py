@@ -7,10 +7,10 @@ import httpx
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.config import get_settings
-from app.prompts import SYSTEM_PROMPT
-from app.utils.helpers import extract_json_from_text, retry_async
-from app.utils.logger import get_logger
+from ..config import get_settings
+from ..prompts import SYSTEM_PROMPT
+from ..utils.helpers import extract_json_from_text, retry_async
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

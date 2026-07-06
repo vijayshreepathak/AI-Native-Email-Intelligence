@@ -1,11 +1,11 @@
 """Evaluation pipeline nodes for LangGraph."""
 
-from app.evaluation.bertscore import compute_bertscore
-from app.evaluation.embedding_similarity import compute_embedding_similarity
-from app.evaluation.overall_score import aggregate_feedback, compute_overall_score
-from app.state import EmailState
-from app.utils.helpers import merge_node_metrics
-from app.utils.logger import get_logger, log_node_execution
+from .bertscore import compute_bertscore
+from .embedding_similarity import compute_embedding_similarity
+from .overall_score import aggregate_feedback, compute_overall_score
+from ..state import EmailState
+from ..utils.helpers import merge_node_metrics
+from ..utils.logger import get_logger, log_node_execution
 
 logger = get_logger(__name__)
 

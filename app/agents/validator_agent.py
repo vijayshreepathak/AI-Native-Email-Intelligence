@@ -1,10 +1,10 @@
 """Response validation agent."""
 
-from app.agents.base import get_llm_client
-from app.prompts import VALIDATION_PROMPT
-from app.state import EmailState
-from app.utils.helpers import merge_node_metrics
-from app.utils.logger import get_logger, log_node_execution
+from .base import get_llm_client
+from ..prompts import VALIDATION_PROMPT
+from ..state import EmailState
+from ..utils.helpers import merge_node_metrics
+from ..utils.logger import get_logger, log_node_execution
 
 logger = get_logger(__name__)
 

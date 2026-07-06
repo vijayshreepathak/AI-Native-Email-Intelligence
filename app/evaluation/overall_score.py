@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from app.constants import EVALUATION_WEIGHTS
+from ..constants import EVALUATION_WEIGHTS
 
 
 def compute_overall_score(

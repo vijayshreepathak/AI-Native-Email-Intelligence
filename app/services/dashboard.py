@@ -4,13 +4,13 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
-from app.config import get_settings
-from app.db.database import database_enabled, get_session
-from app.db.models import EvaluationRecord, GenerationRecord
+from ..config import get_settings
+from ..db.database import database_enabled, get_session
+from ..db.models import EvaluationRecord, GenerationRecord
 from sqlalchemy import select
-from app.models import DashboardMetrics
-from app.utils.helpers import load_json, save_json
-from app.utils.logger import get_logger
+from ..models import DashboardMetrics
+from ..utils.helpers import load_json, save_json
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

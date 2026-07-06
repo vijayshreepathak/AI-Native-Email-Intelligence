@@ -7,9 +7,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.config import get_settings
-from app.db.models import Base
-from app.utils.logger import get_logger
+from ..config import get_settings
+from .models import Base
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

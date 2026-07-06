@@ -1,7 +1,7 @@
 """Embedding cosine similarity evaluation."""
 
-from app.retriever.embeddings import get_embedding_service
-from app.utils.logger import get_logger
+from ..retriever.embeddings import get_embedding_service
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

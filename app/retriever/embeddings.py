@@ -5,8 +5,8 @@ from typing import Any
 
 import numpy as np
 
-from app.config import get_settings
-from app.utils.logger import get_logger
+from ..config import get_settings
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

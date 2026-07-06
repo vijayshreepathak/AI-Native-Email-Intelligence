@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
-from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+PROJECT_ROOT = ROOT
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -70,13 +74,13 @@ def main() -> int:
 
     print("\n--- Files & directories ---")
     paths = {
-        "knowledge/": PROJECT_ROOT / "knowledge",
-        "knowledge_graph.json": PROJECT_ROOT / "knowledge" / "knowledge_graph.json",
-        "dataset/": PROJECT_ROOT / "dataset",
-        "results/": PROJECT_ROOT / "results",
+        "knowledge/": os.path.join(PROJECT_ROOT, "knowledge"),
+        "knowledge_graph.json": os.path.join(PROJECT_ROOT, "knowledge", "knowledge_graph.json"),
+        "dataset/": os.path.join(PROJECT_ROOT, "dataset"),
+        "results/": os.path.join(PROJECT_ROOT, "results"),
     }
     for label, path in paths.items():
-        all_ok &= check(label, path.exists(), str(path))
+        all_ok &= check(label, os.path.exists(path), path)
 
     print("\n--- ChromaDB ---")
     try:

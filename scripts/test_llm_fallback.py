@@ -1,5 +1,12 @@
 """Quick smoke test for Claude + Gemini fallback."""
+
 import asyncio
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 from app.config import get_settings
 from app.agents import base as llm_base

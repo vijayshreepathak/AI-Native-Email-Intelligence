@@ -6,9 +6,9 @@ import jwt
 from fastapi import Header, HTTPException
 from jwt import PyJWKClient
 
-from app.config import get_settings
-from app.db.database import database_enabled
-from app.utils.logger import get_logger
+from ..config import get_settings
+from ..db.database import database_enabled
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

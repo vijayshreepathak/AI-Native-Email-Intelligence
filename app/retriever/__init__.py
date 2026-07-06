@@ -1,8 +1,8 @@
 """Retriever package."""
 
-from app.retriever.embeddings import EmbeddingService, get_embedding_service
-from app.retriever.retrieval import KnowledgeRetriever, get_retriever
-from app.retriever.vector_store import VectorStore, get_vector_store
+from .embeddings import EmbeddingService, get_embedding_service
+from .retrieval import KnowledgeRetriever, get_retriever
+from .vector_store import VectorStore, get_vector_store
 
 __all__ = [
     "EmbeddingService",

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from functools import wraps
 from typing import Any, Callable, Generator, TypeVar
 
-from app.config import get_settings
+from ..config import get_settings
 
 F = TypeVar("F", bound=Callable[..., Any])
 

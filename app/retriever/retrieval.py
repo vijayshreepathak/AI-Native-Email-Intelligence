@@ -2,10 +2,10 @@
 
 from typing import Any
 
-from app.config import get_settings
-from app.retriever.vector_store import get_vector_store
-from app.utils.helpers import load_json
-from app.utils.logger import get_logger
+from ..config import get_settings
+from .vector_store import get_vector_store
+from ..utils.helpers import load_json
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -93,7 +93,7 @@ class KnowledgeRetriever:
 
     def _fallback_from_graph(self, graph_context: dict[str, Any]) -> list[dict[str, Any]]:
         """Fallback retrieval from graph when vector store is empty."""
-        from app.config import FAQ_DIR, POLICIES_DIR, TEMPLATES_DIR
+        from ..config import FAQ_DIR, POLICIES_DIR, TEMPLATES_DIR
 
         results: list[dict[str, Any]] = []
         for node_name in graph_context.get("nodes", {}):

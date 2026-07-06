@@ -1,14 +1,24 @@
-"""Production startup validation — fails loudly on Render when config is missing."""
+"""Production startup validation — runs after package imports succeed."""
 
 from __future__ import annotations
 
 import os
 
-from app.config import Settings, get_settings
+from .config import Settings, get_settings
+from .utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _is_render() -> bool:
     return os.getenv("RENDER", "").lower() in {"true", "1", "yes"}
+
+
+def log_env_diagnostics(settings: Settings | None = None) -> None:
+    """Print readable diagnostics without exposing secrets."""
+    settings = settings or get_settings()
+    for key, value in env_summary(settings).items():
+        logger.info("  %s: %s", key, value)
 
 
 def validate_production_env(settings: Settings | None = None) -> None:
@@ -37,7 +47,7 @@ def validate_production_env(settings: Settings | None = None) -> None:
 
 
 def env_summary(settings: Settings | None = None) -> dict[str, str]:
-    """Return a safe summary of env var presence (never prints secrets)."""
+    """Return env var presence summary (never prints secret values)."""
     settings = settings or get_settings()
     return {
         "DATABASE_URL": "set" if settings.database_url.strip() else "MISSING",

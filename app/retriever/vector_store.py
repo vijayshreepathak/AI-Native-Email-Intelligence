@@ -7,9 +7,9 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from chromadb.utils import embedding_functions
 
-from app.config import KNOWLEDGE_DIR, POLICIES_DIR, get_settings
-from app.utils.helpers import load_json
-from app.utils.logger import get_logger
+from ..config import KNOWLEDGE_DIR, POLICIES_DIR, get_settings
+from ..utils.helpers import load_json
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

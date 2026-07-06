@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Embed knowledge base policies into ChromaDB."""
 
+import os
 import sys
-from pathlib import Path
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.retriever.vector_store import get_vector_store
 from app.utils.logger import setup_logging
