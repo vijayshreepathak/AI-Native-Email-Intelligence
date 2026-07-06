@@ -1,39 +1,51 @@
 """FastAPI application entry point."""
 
+from __future__ import annotations
+
+import sys
 import time
+import traceback
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+# --- bootstrap: validate env and import dependencies with visible tracebacks ---
+try:
+    from app.startup_validation import validate_production_env
 
-from app import __version__
-from app.auth.clerk import get_current_user_id
-from app.config import get_settings
-from app.db.database import database_enabled, init_db
-from app.graph import get_full_graph, get_generate_graph, get_predict_graph
-from app.retriever.vector_store import get_vector_store
-from app.schemas import (
-    DashboardResponse,
-    EmailInput,
-    EvaluateRequest,
-    EvaluateResponse,
-    GenerateResponse,
-    HealthResponse,
-    PredictRequest,
-    PredictResponse,
-)
-from app.services.dashboard import DashboardService, get_dashboard_service
-from app.state import EmailState
-from app.utils.logger import setup_logging, get_logger
+    validate_production_env()
+
+    from fastapi import Depends, FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import ORJSONResponse
+
+    from app import __version__
+    from app.auth.clerk import get_current_user_id
+    from app.config import get_settings
+    from app.db.database import database_enabled, init_db
+    from app.graph import get_full_graph, get_generate_graph, get_predict_graph
+    from app.retriever.vector_store import get_vector_store
+    from app.schemas import (
+        DashboardResponse,
+        EmailInput,
+        EvaluateRequest,
+        EvaluateResponse,
+        GenerateResponse,
+        PredictRequest,
+        PredictResponse,
+    )
+    from app.services.dashboard import get_dashboard_service
+    from app.state import EmailState
+    from app.utils.logger import setup_logging, get_logger
+except Exception:
+    traceback.print_exc()
+    sys.exit(1)
 
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application startup and shutdown — never crash on missing optional deps."""
+    """Application startup and shutdown — defer heavy init; never crash on optional deps."""
     setup_logging()
     settings = get_settings()
     logger.info("Starting AI Email Intelligence Platform v%s", __version__)
@@ -41,7 +53,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if not settings.has_llm_provider:
         logger.warning("No LLM API key configured — generation endpoints will fail")
 
-    init_db()
+    try:
+        init_db()
+    except Exception as exc:
+        logger.warning("Database init skipped: %s", exc)
 
     try:
         vector_store = get_vector_store()
@@ -97,32 +112,30 @@ def _total_latency(node_metrics: dict[str, Any]) -> float:
     return round(sum(m.get("latency_ms", 0) for m in node_metrics.values()), 2)
 
 
-def _chroma_available() -> bool:
-    try:
-        return get_vector_store().document_count > 0
-    except Exception:
-        return False
+@app.get("/")
+async def root() -> dict[str, str]:
+    """Lightweight root probe — no DB, LLM, or auth."""
+    return {"status": "ok"}
 
 
-@app.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
-    """Health check endpoint."""
+@app.get("/health")
+async def health_check() -> dict[str, Any]:
+    """Render health check — env flags only, no DB/LLM/Chroma calls."""
     settings = get_settings()
-    chroma_ok = _chroma_available()
-    return HealthResponse(
-        status="healthy",
-        version=__version__,
-        model=settings.anthropic_model if settings.anthropic_api_key else settings.gemini_model,
-        chroma_available=chroma_ok,
-        llm_provider="claude" if settings.anthropic_api_key else ("gemini" if settings.effective_gemini_key else "none"),
-        fallback_available=bool(settings.effective_gemini_key),
-        providers={
+    return {
+        "status": "healthy",
+        "version": __version__,
+        "model": settings.anthropic_model if settings.anthropic_api_key else settings.gemini_model,
+        "chroma_available": False,
+        "llm_provider": "claude" if settings.anthropic_api_key else ("gemini" if settings.effective_gemini_key else "none"),
+        "fallback_available": bool(settings.effective_gemini_key),
+        "providers": {
             "anthropic": bool(settings.anthropic_api_key),
             "gemini": bool(settings.effective_gemini_key),
-            "chromadb": chroma_ok,
+            "chromadb": False,
             "postgresql": database_enabled(),
         },
-    )
+    }
 
 
 @app.post("/predict", response_model=PredictResponse)

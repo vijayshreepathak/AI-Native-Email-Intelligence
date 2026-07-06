@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI for the AI Email Intelligence Platform."""
+"""CLI for local development — production uses: bash start.sh"""
 
 import asyncio
 import sys

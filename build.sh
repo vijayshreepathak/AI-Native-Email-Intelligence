@@ -7,8 +7,8 @@ export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Embed knowledge if Chroma is empty (no typer/rich — production deps only)
-python - <<'PY' || echo "WARN: embed step skipped or failed — will retry at startup"
+# Optional: index knowledge at build time (non-fatal — lifespan retries)
+python - <<'PY' || echo "WARN: embed step skipped — will retry at startup"
 from app.retriever.vector_store import get_vector_store
 
 vs = get_vector_store()
