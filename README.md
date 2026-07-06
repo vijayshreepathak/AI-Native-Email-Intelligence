@@ -359,4 +359,4 @@ pytest tests/ -v
 
 ## License
 
-MIT — built for the Hiver AI Copilot Challenge.
+MIT
