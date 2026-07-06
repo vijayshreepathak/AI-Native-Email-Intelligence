@@ -20,6 +20,8 @@ import { KnowledgeGraphViz } from "@/components/KnowledgeGraphViz";
 import { PipelineVisualization } from "@/components/PipelineVisualization";
 import { QualityChecklist } from "@/components/QualityChecklist";
 import { RetrievalPanel } from "@/components/RetrievalPanel";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { TAB_HELP } from "@/lib/section-help";
 import type { EvaluateResult, GenerateResult } from "@/lib/types";
 
 const JudgePanel = dynamic(() => import("@/components/JudgePanel").then((m) => m.JudgePanel), {
@@ -48,6 +50,8 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: "judge", label: "Judge", icon: Brain },
   { id: "insights", label: "Insights", icon: Clock },
 ];
+
+const TAB_HELP_MAP: Record<Tab, { heading: string; description: string }> = TAB_HELP;
 
 export function ResultInsights({ result, mode, onRegenerate }: Props) {
   const [tab, setTab] = useState<Tab>("reply");
@@ -82,21 +86,38 @@ export function ResultInsights({ result, mode, onRegenerate }: Props) {
       <div className="panel-scroll shrink-0 overflow-x-auto border-b border-[var(--border)] px-2">
         <div className="flex min-w-max gap-0.5 py-1.5">
           {TABS.map(({ id, label, icon: Icon }) => (
-            <button
+            <div
               key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition ${
-                tab === id
-                  ? "bg-[var(--accent)] text-black"
-                  : "text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+              className={`flex items-center rounded-lg ${
+                tab === id ? "bg-[var(--accent)]" : "hover:bg-[var(--accent-soft)]"
               }`}
             >
-              <Icon className="h-3 w-3" />
-              {label}
-            </button>
+              <button
+                type="button"
+                onClick={() => setTab(id)}
+                className={`flex items-center gap-1 px-2 py-1.5 text-[10px] font-semibold transition ${
+                  tab === id ? "text-black" : "text-[var(--text-muted)] hover:text-[var(--accent)]"
+                }`}
+              >
+                <Icon className="h-3 w-3 shrink-0" />
+                {label}
+              </button>
+              <span className={`pr-1 ${tab === id ? "[&_button]:border-black/30 [&_button]:text-black/70" : ""}`}>
+                <InfoTip
+                  heading={TAB_HELP_MAP[id].heading}
+                  description={TAB_HELP_MAP[id].description}
+                  placement="bottom"
+                />
+              </span>
+            </div>
           ))}
         </div>
+      </div>
+
+      {/* Active tab intro */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)]/60 bg-[var(--surface-muted)]/40 px-4 py-1.5">
+        <p className="text-[10px] font-bold text-[var(--accent)]">{TAB_HELP_MAP[tab].heading}</p>
+        <p className="text-[10px] text-[var(--text-muted)]">{TAB_HELP_MAP[tab].description}</p>
       </div>
 
       {/* Content — grows naturally; page main-scroll handles vertical scroll */}

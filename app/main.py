@@ -151,7 +151,10 @@ async def predict(
         result = await graph.ainvoke(state)
     except Exception as exc:
         logger.error("Predict pipeline failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=503,
+            detail=f"Pipeline failed: {exc}. Check LLM API keys and restart the backend.",
+        ) from exc
 
     latency = round((time.perf_counter() - start) * 1000, 2)
     return PredictResponse(
@@ -177,7 +180,10 @@ async def generate(
         result = await graph.ainvoke(state)
     except Exception as exc:
         logger.error("Generate pipeline failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=503,
+            detail=f"Pipeline failed: {exc}. Check LLM keys and restart the backend.",
+        ) from exc
 
     node_metrics = result.get("node_metrics", {})
     latency = _total_latency(node_metrics)
@@ -224,7 +230,10 @@ async def evaluate(
         result = await graph.ainvoke(state)
     except Exception as exc:
         logger.error("Evaluate pipeline failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=503,
+            detail=f"Pipeline failed: {exc}. Check LLM keys (GEMINI_API_KEY) and restart the backend after .env changes.",
+        ) from exc
 
     eval_result = {
         "subject": request.subject,

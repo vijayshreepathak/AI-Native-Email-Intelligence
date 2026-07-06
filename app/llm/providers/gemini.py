@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+import certifi
 import httpx
 
 from ..base import BaseLLMProvider, LLMGenerationResult, ProviderError, ProviderTimeoutError, RateLimitError
@@ -39,7 +40,7 @@ class GeminiProvider(BaseLLMProvider):
 
         start = time.perf_counter()
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, verify=certifi.where()) as client:
                 resp = await client.post(url, params={"key": self.api_key}, json=payload)
         except httpx.TimeoutException as exc:
             raise ProviderTimeoutError(str(exc)) from exc

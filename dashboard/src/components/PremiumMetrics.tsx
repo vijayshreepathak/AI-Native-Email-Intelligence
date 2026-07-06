@@ -11,6 +11,8 @@ import {
   qualityLabel,
 } from "@/lib/metrics";
 import type { DashboardMetrics, EvaluateResult, GenerateResult } from "@/lib/types";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { METRIC_HELP } from "@/lib/section-help";
 
 interface Props {
   metrics: DashboardMetrics | null;
@@ -47,6 +49,7 @@ export function PremiumMetrics({ metrics, result }: Props) {
       <MetricCard
         icon={Sparkles}
         title="Overall AI Quality"
+        help={METRIC_HELP.quality}
         accent
         main={
           <div className="flex items-baseline gap-2">
@@ -57,10 +60,7 @@ export function PremiumMetrics({ metrics, result }: Props) {
         sub={`${metrics?.total_processed ?? 0} evaluations`}
       />
 
-      <MetricCard
-        icon={Clock}
-        title="Latency"
-        main={
+      <MetricCard icon={Clock} title="Latency" help={METRIC_HELP.latency} main={
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
             <LatencyRow label="Generation" ms={latency.generation} />
             <LatencyRow label="Retrieval" ms={latency.retrieval} />
@@ -70,10 +70,7 @@ export function PremiumMetrics({ metrics, result }: Props) {
         }
       />
 
-      <MetricCard
-        icon={Activity}
-        title="Token Usage"
-        main={
+      <MetricCard icon={Activity} title="Token Usage" help={METRIC_HELP.tokens} main={
           <div className="grid grid-cols-3 gap-2 text-center">
             <TokenCol label="Prompt" value={tokens.prompt} />
             <TokenCol label="Completion" value={tokens.completion} />
@@ -82,10 +79,7 @@ export function PremiumMetrics({ metrics, result }: Props) {
         }
       />
 
-      <MetricCard
-        icon={Shield}
-        title="Grounded Responses"
-        main={
+      <MetricCard icon={Shield} title="Grounded Responses" help={METRIC_HELP.grounded} main={
           <div>
             <CountUp value={grounded.groundedPct} suffix="%" className="text-2xl font-black text-[var(--success)]" />
             <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px]">
@@ -109,12 +103,14 @@ function MetricCard({
   main,
   sub,
   accent,
+  help,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   main: React.ReactNode;
   sub?: string;
   accent?: boolean;
+  help?: { heading: string; description: string };
 }) {
   return (
     <motion.div
@@ -126,6 +122,7 @@ function MetricCard({
           <Icon className="h-3.5 w-3.5 text-[var(--accent)]" />
         </div>
         <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-subtle)]">{title}</span>
+        {help && <InfoTip heading={help.heading} description={help.description} placement="bottom" />}
       </div>
       {main}
       {sub && <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">{sub}</p>}

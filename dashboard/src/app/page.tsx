@@ -8,7 +8,9 @@ import type { DashboardMetrics, EvaluateResult, GenerateResult, HealthStatus } f
 import { ClientOnly } from "@/components/ClientOnly";
 import { EvaluateForm } from "@/components/EvaluateForm";
 import { Header } from "@/components/Header";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { PremiumMetrics } from "@/components/PremiumMetrics";
+import { ANALYTICS_HELP } from "@/lib/section-help";
 import { ReplyViewer } from "@/components/ReplyViewer";
 
 const AnalyticsDashboard = dynamic(
@@ -41,11 +43,16 @@ export default function DashboardPage() {
     setRefreshing(true);
     setApiError(null);
     try {
-      const [h, s, d] = await Promise.all([api.health(), api.status(), api.dashboard()]);
+      const [h, s] = await Promise.all([api.health(), api.status()]);
       setHealth({ ...s, status: h.status, version: h.version });
-      setMetrics(d.metrics);
+      try {
+        const d = await api.dashboard();
+        setMetrics(d.metrics);
+      } catch {
+        /* dashboard optional when auth/DB not configured */
+      }
     } catch {
-      setApiError("Backend offline — run: python cli.py serve");
+      setApiError(`Backend offline — start API: uvicorn app.main:app --reload --port 8000`);
     } finally {
       setRefreshing(false);
     }
@@ -128,6 +135,11 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <BarChart2 className="h-5 w-5 text-[var(--accent)]" />
             <h2 className="text-sm font-bold text-[var(--text)]">Analytics</h2>
+            <InfoTip
+              heading={ANALYTICS_HELP.heading}
+              description={ANALYTICS_HELP.description}
+              placement="bottom"
+            />
             <span className="hidden text-xs text-[var(--text-muted)] sm:inline">
               Historical evaluation performance
             </span>

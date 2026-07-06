@@ -1,11 +1,22 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+import { networkErrorMessage, parseApiError } from "./errors";
 
-import { parseApiError } from "./errors";
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+
+/** Browser uses same-origin proxy (CORS-safe, long timeouts). SSR uses backend URL directly. */
+function apiBase(): string {
+  if (typeof window !== "undefined") return "/api/proxy";
+  return BACKEND_URL;
+}
 
 let tokenGetter: (() => Promise<string | null>) | null = null;
 
 export function configureApiAuth(fn: () => Promise<string | null>) {
   tokenGetter = fn;
+}
+
+function timeoutForPath(path: string): number {
+  if (path.startsWith("/evaluate") || path.startsWith("/generate")) return 300_000;
+  return 60_000;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -19,17 +30,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(parseApiError(text || `Request failed (${res.status})`));
+  const url = `${apiBase()}${path}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutForPath(path));
+
+  try {
+    const res = await fetch(url, { ...init, headers, signal: controller.signal });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(parseApiError(text || `Request failed (${res.status})`));
+    }
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (err instanceof Error && err.message !== "Failed to fetch" && err.name !== "AbortError") {
+      throw err;
+    }
+    throw new Error(networkErrorMessage(err, BACKEND_URL, path));
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 export const api = {
-  health: () =>
-    request<{ status: string; version: string }>("/health"),
+  backendUrl: BACKEND_URL,
+  health: () => request<{ status: string; version: string }>("/health"),
   status: () =>
     request<{
       status: string;
@@ -50,6 +74,6 @@ export const api = {
   predict: (body: { subject: string; email: string }) =>
     request<{ intent: string; priority: string; sentiment: string; customer_type: string; latency_ms: number }>(
       "/predict",
-      { method: "POST", body: JSON.stringify(body) }
+      { method: "POST", body: JSON.stringify(body) },
     ),
 };

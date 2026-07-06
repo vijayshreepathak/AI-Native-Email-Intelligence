@@ -4,7 +4,9 @@ import { AlertCircle, Loader2, Send, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ClientOnly } from "@/components/ClientOnly";
 import { SampleTickets } from "@/components/SampleTickets";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { api } from "@/lib/api";
+import { PLAYGROUND_HELP } from "@/lib/section-help";
 import type { EvaluateResult, GenerateResult } from "@/lib/types";
 
 interface Props {
@@ -64,7 +66,8 @@ export function EvaluateForm({ onResult, onLoading, onRegisterRegenerate }: Prop
           onResult(result, "evaluate");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Request failed");
+        const msg = err instanceof Error ? err.message : "Request failed";
+        setError(msg);
       } finally {
         setLoading(false);
         onLoading?.(false);
@@ -88,23 +91,41 @@ export function EvaluateForm({ onResult, onLoading, onRegisterRegenerate }: Prop
         <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--accent)]">
           <Sparkles className="h-4 w-4" />
           Copilot Playground
+          <InfoTip
+            heading={PLAYGROUND_HELP.heading}
+            description={PLAYGROUND_HELP.description}
+            placement="bottom"
+          />
         </h2>
         <ClientOnly>
-          <div className="flex rounded-lg bg-[var(--surface-muted)] p-1">
-            {(["generate", "evaluate"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => switchMode(m)}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                  mode === m
-                    ? "bg-[var(--accent)] text-black shadow-[0_0_8px_var(--accent-glow)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--accent)]"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 rounded-lg bg-[var(--surface-muted)] p-1">
+              {(["generate", "evaluate"] as const).map((m) => (
+                <div
+                  key={m}
+                  className={`flex items-center rounded-md ${
+                    mode === m ? "bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => switchMode(m)}
+                    className={`px-2.5 py-1.5 text-xs font-semibold capitalize transition ${
+                      mode === m ? "text-black" : "text-[var(--text-muted)] hover:text-[var(--accent)]"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                  <span className={`pr-1 ${mode === m ? "[&_button]:border-black/30 [&_button]:text-black/70" : ""}`}>
+                    <InfoTip
+                      heading={PLAYGROUND_HELP[m].heading}
+                      description={PLAYGROUND_HELP[m].description}
+                      placement="bottom"
+                    />
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </ClientOnly>
       </div>
