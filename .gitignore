@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+knowledge/embeddings/chroma/
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+checkpoint.json
