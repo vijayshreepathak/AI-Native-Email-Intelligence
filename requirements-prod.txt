@@ -1,0 +1,3 @@
+# Legacy alias — Render preDeployCommand may still reference this filename.
+# Production deps are defined in requirements.txt (single source of truth).
+-r requirements.txt
