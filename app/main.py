@@ -15,6 +15,7 @@ from .auth.clerk import get_current_user_id
 from .config import get_settings
 from .db.database import init_db
 from .graph import get_full_graph, get_generate_graph, get_predict_graph
+from .llm.gateway import get_llm_gateway
 from .retriever.vector_store import get_vector_store
 from .schemas import (
     DashboardResponse,
@@ -70,7 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="AI Email Intelligence Platform",
-    description="Production-quality AI email reply system powered by LangGraph and Claude",
+    description="Production-quality AI email reply system powered by LangGraph and a multi-provider LLM gateway",
     version=__version__,
     default_response_class=ORJSONResponse,
     lifespan=lifespan,
@@ -116,9 +117,31 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/health")
-async def health_check() -> dict[str, str]:
-    """Render health check — no database, LLM, Chroma, or Clerk."""
-    return {"status": "healthy"}
+async def health_check() -> dict[str, Any]:
+    """Health check with LLM gateway status (Render-safe — no external calls)."""
+    settings = get_settings()
+    gateway = get_llm_gateway()
+    stats = gateway.stats
+
+    chroma_available = False
+    try:
+        chroma_available = get_vector_store().document_count > 0
+    except Exception:
+        pass
+
+    return {
+        "status": "healthy",
+        "version": __version__,
+        "model": stats.current_model or settings.llm_model,
+        "chroma_available": chroma_available,
+        "llm_provider": stats.current_provider or settings.llm_provider,
+        "fallback_available": settings.fallback_available,
+        "fallback_provider": settings.fallback_provider,
+        "fallback_used": stats.fallback_used,
+        "retries": stats.total_retries,
+        "provider_latency_ms": stats.last_latency_ms,
+        "providers": settings.providers_configured(),
+    }
 
 
 @app.post("/predict", response_model=PredictResponse)

@@ -9,6 +9,7 @@ from ..db.database import database_enabled, get_session
 from ..db.models import EvaluationRecord, GenerationRecord
 from sqlalchemy import select
 from ..models import DashboardMetrics
+from ..llm.gateway import get_llm_gateway
 from ..utils.helpers import load_json, save_json
 from ..utils.logger import get_logger
 
@@ -47,8 +48,18 @@ class DashboardService:
     def compute_metrics(self) -> DashboardMetrics:
         """Compute aggregated dashboard metrics from evaluation results."""
         evaluations = self._load_evaluations()
+        gateway_stats = get_llm_gateway().stats
+        llm_fields = {
+            "llm_provider": gateway_stats.current_provider,
+            "llm_model": gateway_stats.current_model,
+            "fallback_provider": gateway_stats.fallback_provider,
+            "fallback_used": gateway_stats.fallback_used,
+            "llm_retries": gateway_stats.total_retries,
+            "provider_latency_ms": gateway_stats.last_latency_ms,
+            "llm_cache_hits": gateway_stats.cache_hits,
+        }
         if not evaluations:
-            return DashboardMetrics()
+            return DashboardMetrics(**llm_fields)
 
         scores: list[float] = []
         latencies: list[float] = []
@@ -87,6 +98,7 @@ class DashboardService:
 
         judge_distribution = {k: round(sum(v) / len(v), 4) for k, v in judge_scores.items()}
 
+        gateway_stats = get_llm_gateway().stats
         return DashboardMetrics(
             average_score=round(sum(scores) / len(scores), 4) if scores else 0.0,
             average_latency_ms=round(sum(latencies) / len(latencies), 2) if latencies else 0.0,
@@ -99,6 +111,13 @@ class DashboardService:
             else 0.0,
             judge_distribution=judge_distribution,
             last_updated=datetime.utcnow(),
+            llm_provider=gateway_stats.current_provider,
+            llm_model=gateway_stats.current_model,
+            fallback_provider=gateway_stats.fallback_provider,
+            fallback_used=gateway_stats.fallback_used,
+            llm_retries=gateway_stats.total_retries,
+            provider_latency_ms=gateway_stats.last_latency_ms,
+            llm_cache_hits=gateway_stats.cache_hits,
         )
 
     def save_dashboard(self) -> DashboardMetrics:

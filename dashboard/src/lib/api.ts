@@ -34,6 +34,12 @@ export const api = {
       version: string;
       model: string;
       chroma_available: boolean;
+      llm_provider?: string;
+      fallback_available?: boolean;
+      fallback_provider?: string;
+      fallback_used?: boolean;
+      retries?: number;
+      provider_latency_ms?: number;
       providers?: Record<string, boolean>;
     }>("/health"),
   dashboard: () => request<{ metrics: import("./types").DashboardMetrics }>("/dashboard"),

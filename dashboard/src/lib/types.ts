@@ -8,6 +8,13 @@ export interface DashboardMetrics {
   hallucination_rate: number;
   judge_distribution: Record<string, number>;
   last_updated?: string;
+  llm_provider?: string;
+  llm_model?: string;
+  fallback_provider?: string;
+  fallback_used?: boolean;
+  llm_retries?: number;
+  provider_latency_ms?: number;
+  llm_cache_hits?: number;
 }
 
 export interface EvaluateResult {
@@ -57,4 +64,9 @@ export interface HealthStatus {
   chroma_available: boolean;
   llm_provider?: string;
   fallback_available?: boolean;
+  fallback_provider?: string;
+  fallback_used?: boolean;
+  retries?: number;
+  provider_latency_ms?: number;
+  providers?: Record<string, boolean>;
 }

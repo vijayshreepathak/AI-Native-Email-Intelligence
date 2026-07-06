@@ -128,3 +128,10 @@ class DashboardMetrics(BaseModel):
     hallucination_rate: float = 0.0
     judge_distribution: dict[str, float] = Field(default_factory=dict)
     last_updated: datetime = Field(default_factory=datetime.utcnow)
+    llm_provider: str = ""
+    llm_model: str = ""
+    fallback_provider: str = ""
+    fallback_used: bool = False
+    llm_retries: int = 0
+    provider_latency_ms: float = 0.0
+    llm_cache_hits: int = 0

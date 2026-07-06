@@ -270,7 +270,7 @@ Historical quality trends, grounding scores, latency charts, and intent distribu
 3. Pick a sample ticket → **Generate Reply** or switch to **Evaluate**
 4. Click **Sync** if metrics show dashes (Render free tier may need a moment to wake)
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for full production setup (Render + Vercel + Neon + Clerk).
+See **[RENDER_DEPLOY.md](./RENDER_DEPLOY.md)** for full production setup (Render + Vercel + Neon + Clerk).
 
 ---
 
@@ -328,20 +328,83 @@ pip install -r requirements-dev.txt   # includes production deps + CLI + pytest
 
 #### 2. Configure environment
 
+You need **two** env files:
+
+| File | Template | Used by |
+|------|----------|---------|
+| `.env` | [`.env.example`](./.env.example) | FastAPI backend (LLM, DB, Clerk) |
+| `dashboard/.env.local` | [`dashboard/.env.local.example`](./dashboard/.env.local.example) | Next.js dashboard |
+
+**Backend** — copy the template, then paste your keys:
+
 ```bash
-cp .env.example .env
+cp .env.example .env          # Mac/Linux
+copy .env.example .env        # Windows
 ```
 
-Edit `.env`:
+Open `.env` and fill in the sections below (same layout as `.env.example`):
 
 ```env
-ANTHROPIC_API_KEY=your_claude_key          # primary LLM
-ANTHROPIC_MODEL=claude-sonnet-4-6
-GEMINI_API_KEY=your_gemini_key             # fallback when Claude fails
-GEMINI_MODEL=gemini-2.5-flash
+# ── Primary Provider ─────────────────────────────────────────────────────────
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-2.5-flash-lite
+
+# ── First Fallback ───────────────────────────────────────────────────────────
+FALLBACK_PROVIDER=groq
+FALLBACK_MODEL=llama-3.3-70b-versatile
+
+# ── Second Fallback ──────────────────────────────────────────────────────────
+SECONDARY_PROVIDER=openai
+SECONDARY_MODEL=gpt-4.1-mini
+
+# ── API Keys (paste from provider dashboards) ────────────────────────────────
+GEMINI_API_KEY=xxxxxxxxxxxxxxxxx
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxx
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxx
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxx
+
+# ── General LLM Parameters ───────────────────────────────────────────────────
+TEMPERATURE=0
+MAX_TOKENS=4096
+MAX_RETRIES=5
+REQUEST_TIMEOUT=60
 ```
 
-> **Tip:** If Claude credits expire, the pipeline automatically falls back to Gemini. You only need `GEMINI_API_KEY` set.
+> **Tip:** You only need **one** API key to start (e.g. `GEMINI_API_KEY`). Failover providers are skipped until their keys are set.
+
+| Key | Get it from |
+|-----|-------------|
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) |
+| `GROQ_API_KEY` | [Groq Console](https://console.groq.com/keys) |
+| `OPENAI_API_KEY` | [OpenAI API Keys](https://platform.openai.com/api-keys) |
+| `ANTHROPIC_API_KEY` | [Anthropic Console](https://console.anthropic.com/settings/keys) |
+
+**Dashboard** — copy and edit `dashboard/.env.local`:
+
+```bash
+cd dashboard
+cp .env.local.example .env.local    # Mac/Linux
+copy .env.local.example .env.local  # Windows
+```
+
+Paste these values:
+
+```env
+# Local backend (must match uvicorn port)
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+
+# Optional — leave blank for local dev without sign-in
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+```
+
+| File | Variable | Where to paste from |
+|------|----------|---------------------|
+| `dashboard/.env.local` | `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8000` locally · Render URL in production |
+| `dashboard/.env.local` | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | [Clerk Dashboard](https://dashboard.clerk.com/) → API Keys |
+| `dashboard/.env.local` | `CLERK_SECRET_KEY` | Same Clerk page → Secret key |
+
+See [Environment Variables](#environment-variables) for production vars (Neon, Clerk JWT on Render, CORS).
 
 #### 3. Index knowledge base
 
@@ -361,6 +424,8 @@ uvicorn app.main:app --reload --port 8000
 
 ```bash
 cd dashboard
+cp .env.local.example .env.local   # first time only — then edit values
+npm install                        # first time only
 npm run dev
 # UI → http://localhost:3000
 ```
@@ -476,7 +541,11 @@ Generates 300 synthetic Hiver-style emails (30 intents × 10). Features incremen
 ```
 ai-email-intelligence/
 ├── app/                     # FastAPI + LangGraph backend
-│   ├── agents/              # Pipeline agent nodes + LLM client (Claude/Gemini)
+│   ├── agents/              # Pipeline agent nodes (call LLMGateway only)
+│   ├── llm/                 # Provider-agnostic LLM gateway
+│   │   ├── gateway.py       # Retries, caching, failover
+│   │   ├── factory.py       # LLMFactory.create(provider)
+│   │   └── providers/       # gemini, groq, openai, anthropic
 │   ├── retriever/           # ChromaDB + knowledge graph
 │   ├── evaluation/          # BERTScore, embeddings, judge
 │   ├── services/            # Dashboard aggregation
@@ -509,7 +578,7 @@ ai-email-intelligence/
 python cli.py serve --port 8000
 python cli.py generate-reply "Subject" "Email body" --name "Customer"
 python cli.py evaluate-dataset --split test --limit 5
-python scripts/test_llm_fallback.py    # verify Claude → Gemini fallback
+python scripts/test_llm_fallback.py    # verify LLM gateway + failover
 ```
 
 ---
@@ -532,14 +601,94 @@ pytest tests/test_evaluation.py -v
 
 ---
 
+---
+
+## LLM Gateway
+
+All LLM calls go through **`LLMGateway.generate()`** — agents never call Gemini, OpenAI, Groq, or Anthropic directly.
+
+```mermaid
+flowchart LR
+    Agents["LangGraph Agents"] --> Gateway["LLMGateway.generate()"]
+    Gateway --> Cache["SHA256 Prompt Cache"]
+    Cache -->|miss| Primary["Primary Provider"]
+    Primary -->|429 / timeout| Retry["Exponential Backoff"]
+    Retry -->|still fails| Fallback["Fallback Provider"]
+    Fallback -->|fails| Secondary["Secondary Provider"]
+    Secondary -->|all fail| Error["Structured JSON Error"]
+    Primary --> Factory["LLMFactory.create()"]
+    Fallback --> Factory
+    Secondary --> Factory
+    Factory --> P1["Gemini"]
+    Factory --> P2["Groq"]
+    Factory --> P3["OpenAI"]
+    Factory --> P4["Anthropic"]
+```
+
+### Switch providers
+
+Set `LLM_PROVIDER` and `LLM_MODEL` in `.env` — no code changes required:
+
+```bash
+# Use Groq as primary
+LLM_PROVIDER=groq
+LLM_MODEL=llama-3.3-70b-versatile
+GROQ_API_KEY=gsk_...
+```
+
+Supported values for `LLM_PROVIDER`: `gemini`, `groq`, `openai`, `anthropic`.
+
+### Change models
+
+| Role | Env vars | Example |
+|------|----------|---------|
+| Primary | `LLM_PROVIDER`, `LLM_MODEL` | `gemini`, `gemini-2.5-flash-lite` |
+| Fallback | `FALLBACK_PROVIDER`, `FALLBACK_MODEL` | `groq`, `llama-3.3-70b-versatile` |
+| Secondary | `SECONDARY_PROVIDER`, `SECONDARY_MODEL` | `openai`, `gpt-4.1-mini` |
+
+Legacy `ANTHROPIC_MODEL` / `GEMINI_MODEL` still apply when a provider is created without an explicit model.
+
+### Failover behavior
+
+1. **Primary** — up to `MAX_RETRIES` attempts with exponential backoff on HTTP 429, rate limits, and timeouts.
+2. **Fallback** — same retry policy if primary exhausts retries.
+3. **Secondary** — final provider in the chain.
+4. **Configured extras** — any provider with an API key but not listed above is tried last (backward compatible with single-key deployments).
+5. **Total failure** — returns structured JSON `{"error": true, "code": "llm_unavailable", ...}` instead of crashing.
+
+Identical prompts are cached by **SHA256** hash (`CACHE_TTL_SECONDS`, default 3600s).
+
+### Dashboard & health
+
+`GET /health` and `GET /dashboard` expose:
+
+- Current provider / model
+- Fallback provider and whether fallback was used
+- Retry count and last provider latency
+- Cache hits
+
+---
+
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | — | Primary Claude API key |
-| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Claude model |
-| `GEMINI_API_KEY` | — | Fallback Gemini API key |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model |
+| `LLM_PROVIDER` | `gemini` | Primary LLM provider |
+| `LLM_MODEL` | `gemini-2.5-flash-lite` | Primary model |
+| `FALLBACK_PROVIDER` | `groq` | First failover provider |
+| `FALLBACK_MODEL` | `llama-3.3-70b-versatile` | Fallback model |
+| `SECONDARY_PROVIDER` | `openai` | Second failover provider |
+| `SECONDARY_MODEL` | `gpt-4.1-mini` | Secondary model |
+| `TEMPERATURE` | `0` | Generation temperature |
+| `MAX_TOKENS` | `4096` | Max output tokens |
+| `REQUEST_TIMEOUT` | `60` | Provider request timeout (seconds) |
+| `MAX_RETRIES` | `5` | Retries per provider (429/timeout) |
+| `GEMINI_API_KEY` | — | Google Gemini API key |
+| `GROQ_API_KEY` | — | Groq API key |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Legacy Anthropic model override |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Legacy Gemini model override |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence transformer |
 | `RETRIEVAL_TOP_K` | `3` | Documents retrieved per query |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
@@ -550,11 +699,21 @@ pytest tests/test_evaluation.py -v
 | `CLERK_ISSUER` | — | Clerk issuer URL, e.g. `https://xxx.clerk.accounts.dev` |
 | `CLERK_JWKS_URL` | — | Clerk JWKS URL for token verification |
 
+### Dashboard (`dashboard/.env.local`)
+
+Copy from `dashboard/.env.local.example`:
+
+| Variable | Local example | Production |
+|----------|---------------|------------|
+| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8000` | `https://your-service.onrender.com` |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_test_...` (optional locally) | `pk_live_...` from Clerk |
+| `CLERK_SECRET_KEY` | `sk_test_...` (optional locally) | `sk_live_...` from Clerk |
+
 ---
 
 ## Deployment
 
-See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for Render, Vercel, Neon, Clerk, Railway, Docker, and local instructions.
+See **[RENDER_DEPLOY.md](./RENDER_DEPLOY.md)** for Render checklist, env vars, and verify steps.
 
 ### Backend → [Render](https://render.com)
 
@@ -563,12 +722,28 @@ The repo includes a [Render Blueprint](https://render.com/docs/blueprint-spec) (
 1. Push the repo to [GitHub](https://github.com/vijayshreepathak/AI-Native-Email-Intelligence)
 2. In Render: **New → Blueprint** → connect the repo
 3. Set secret env vars in the Render dashboard:
-   - `GEMINI_API_KEY` (and/or `ANTHROPIC_API_KEY`)
-   - `DATABASE_URL` → **paste your Neon connection string here**
-   - `CLERK_SECRET_KEY`, `CLERK_ISSUER`, `CLERK_JWKS_URL`
-   - `CORS_ORIGINS` → `https://ainativeemail.vercel.app`
+
+```env
+# LLM — at least one API key required
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-2.5-flash-lite
+GEMINI_API_KEY=AIza...
+GROQ_API_KEY=gsk_...              # optional failover
+OPENAI_API_KEY=sk-...             # optional secondary
+ANTHROPIC_API_KEY=sk-ant-...      # optional
+
+# Database + auth
+DATABASE_URL=postgresql://...     # Neon connection string
+CLERK_SECRET_KEY=sk_...
+CLERK_ISSUER=https://xxx.clerk.accounts.dev
+CLERK_JWKS_URL=https://xxx.clerk.accounts.dev/.well-known/jwks.json
+
+# Frontend CORS
+CORS_ORIGINS=https://ainativeemail.vercel.app
+```
+
 4. Deploy — build runs `pip install -r requirements.txt` (no Torch/BERTScore)
-5. Copy the Render URL for Vercel `NEXT_PUBLIC_API_URL`
+5. Copy the Render URL → paste into Vercel `NEXT_PUBLIC_API_URL`
 
 **Render settings (manual deploy):**
 
@@ -590,13 +765,18 @@ The repo includes a [Render Blueprint](https://render.com/docs/blueprint-spec) (
 
 1. Import the GitHub repo in Vercel
 2. Set **Root Directory** to `dashboard`
-3. Add environment variables:
+3. Add environment variables (paste from Clerk + Render):
 
 ```env
-NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
-CLERK_SECRET_KEY=sk_...
+# Render backend URL — no trailing slash
+NEXT_PUBLIC_API_URL=https://your-service-name.onrender.com
+
+# Clerk → https://dashboard.clerk.com/ → your app → API Keys
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
+CLERK_SECRET_KEY=sk_live_...
 ```
+
+Copy `dashboard/.env.local.example` for the full commented template.
 
 4. Deploy — Vercel auto-detects Next.js via `dashboard/vercel.json`
 

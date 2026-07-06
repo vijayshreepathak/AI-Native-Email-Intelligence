@@ -34,7 +34,7 @@ export function Header({ health, onRefresh, refreshing, onScrollToAnalytics }: H
           </div>
           <div className="hidden sm:block">
             <h1 className="text-sm font-bold leading-none text-[var(--accent)]">Email Intelligence</h1>
-            <p className="mt-0.5 text-[9px] text-[var(--text-subtle)]">LangGraph · Claude · Gemini · RAG</p>
+            <p className="mt-0.5 text-[9px] text-[var(--text-subtle)]">LangGraph · LLM Gateway · RAG</p>
           </div>
 
           <ClientOnly>
@@ -54,10 +54,14 @@ export function Header({ health, onRefresh, refreshing, onScrollToAnalytics }: H
           <div className="hidden items-center gap-3 text-[10px] text-[var(--text-muted)] lg:flex">
             <span className="flex items-center gap-1">
               <Brain className="h-3 w-3 text-[var(--accent)]" />
-              <span className="text-[var(--text)]">{health.model}</span>
-              {health.fallback_available && (
+              <span className="text-[var(--text)]">
+                {health.llm_provider ? `${health.llm_provider}/` : ""}
+                {health.model}
+              </span>
+              {health.fallback_available && health.fallback_provider && (
                 <span className="rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[9px] text-[var(--accent)]">
-                  + Gemini fallback
+                  fallback: {health.fallback_provider}
+                  {health.fallback_used ? " (used)" : ""}
                 </span>
               )}
             </span>

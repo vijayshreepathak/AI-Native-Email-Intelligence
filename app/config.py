@@ -26,11 +26,28 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # LLM gateway — primary / fallback / secondary
+    llm_provider: str = Field(default="gemini", alias="LLM_PROVIDER")
+    llm_model: str = Field(default="gemini-2.5-flash-lite", alias="LLM_MODEL")
+    fallback_provider: str = Field(default="groq", alias="FALLBACK_PROVIDER")
+    fallback_model: str = Field(default="llama-3.3-70b-versatile", alias="FALLBACK_MODEL")
+    secondary_provider: str = Field(default="openai", alias="SECONDARY_PROVIDER")
+    secondary_model: str = Field(default="gpt-4.1-mini", alias="SECONDARY_MODEL")
+
+    temperature: float = Field(default=0.0, alias="TEMPERATURE")
+    max_tokens: int = Field(default=4096, alias="MAX_TOKENS")
+    request_timeout: int = Field(default=60, alias="REQUEST_TIMEOUT")
+
+    # Provider API keys
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
-    anthropic_model: str = Field(default="claude-sonnet-4-6", alias="ANTHROPIC_MODEL")
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+
+    # Legacy per-provider model overrides (backward compatible)
+    anthropic_model: str = Field(default="claude-sonnet-4-6", alias="ANTHROPIC_MODEL")
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
 
     embedding_model: str = Field(default="all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")
     chroma_persist_dir: Path = Field(
@@ -42,7 +59,7 @@ class Settings(BaseSettings):
         alias="LOG_LEVEL",
     )
     cache_ttl_seconds: int = Field(default=3600, alias="CACHE_TTL_SECONDS")
-    max_retries: int = Field(default=3, alias="MAX_RETRIES")
+    max_retries: int = Field(default=5, alias="MAX_RETRIES")
     retrieval_top_k: int = Field(default=3, alias="RETRIEVAL_TOP_K")
     knowledge_graph_path: Path = Field(default=KNOWLEDGE_DIR / "knowledge_graph.json")
     generated_results_path: Path = Field(default=RESULTS_DIR / "generated.json")
@@ -63,7 +80,15 @@ class Settings(BaseSettings):
         alias="CORS_ORIGIN_REGEX",
     )
 
-    @field_validator("database_url", "anthropic_api_key", "gemini_api_key", "google_api_key", mode="before")
+    @field_validator(
+        "database_url",
+        "anthropic_api_key",
+        "gemini_api_key",
+        "google_api_key",
+        "groq_api_key",
+        "openai_api_key",
+        mode="before",
+    )
     @classmethod
     def strip_strings(cls, v: object) -> object:
         return v.strip() if isinstance(v, str) else v
@@ -72,9 +97,48 @@ class Settings(BaseSettings):
     def effective_gemini_key(self) -> str:
         return self.gemini_api_key or self.google_api_key
 
+    def api_key_for_provider(self, provider: str) -> str:
+        name = provider.strip().lower()
+        if name in {"anthropic", "claude"}:
+            return self.anthropic_api_key
+        if name == "gemini":
+            return self.effective_gemini_key
+        if name == "groq":
+            return self.groq_api_key
+        if name == "openai":
+            return self.openai_api_key
+        return ""
+
+    def model_for_provider(self, provider: str) -> str:
+        name = provider.strip().lower()
+        if name in {"anthropic", "claude"}:
+            return self.anthropic_model
+        if name == "gemini":
+            return self.gemini_model
+        if name == self.fallback_provider.strip().lower():
+            return self.fallback_model
+        if name == self.secondary_provider.strip().lower():
+            return self.secondary_model
+        if name == self.llm_provider.strip().lower():
+            return self.llm_model
+        return self.llm_model
+
+    def providers_configured(self) -> dict[str, bool]:
+        return {
+            "gemini": bool(self.effective_gemini_key),
+            "groq": bool(self.groq_api_key),
+            "openai": bool(self.openai_api_key),
+            "anthropic": bool(self.anthropic_api_key),
+        }
+
     @property
     def has_llm_provider(self) -> bool:
-        return bool(self.anthropic_api_key or self.effective_gemini_key)
+        return any(self.providers_configured().values())
+
+    @property
+    def fallback_available(self) -> bool:
+        fb = self.fallback_provider.strip().lower()
+        return bool(self.api_key_for_provider(fb))
 
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

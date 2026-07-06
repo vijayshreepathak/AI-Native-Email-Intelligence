@@ -1,4 +1,4 @@
-"""Quick smoke test for Claude + Gemini fallback."""
+"""Quick smoke test for the LLM gateway and provider failover."""
 
 import asyncio
 import os
@@ -9,20 +9,26 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from app.config import get_settings
-from app.agents import base as llm_base
+from app.llm.gateway import get_llm_gateway
 
 
 async def main() -> None:
     get_settings.cache_clear()
-    llm_base._llm_client = None
-    client = llm_base.get_llm_client()
-    result, metrics = await client.invoke(
+    global _gateway  # noqa: PLW0603
+    import app.llm.gateway as gw
+
+    gw._gateway = None
+    gateway = get_llm_gateway()
+    result, metrics = await gateway.generate(
         'Return JSON only: {"status": "ok"}',
         parse_json=True,
     )
     print("provider:", metrics.get("provider"))
     print("model:", metrics.get("model"))
+    print("retries:", metrics.get("retries"))
+    print("fallback_used:", metrics.get("fallback_used"))
     print("result:", result)
+    print("stats:", gateway.stats.to_dict())
 
 
 if __name__ == "__main__":
