@@ -19,7 +19,7 @@ export function ReplyViewer({ result, mode, loading, onRegenerate }: Props) {
 
   if (!result) {
     return (
-      <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-muted)]/50 p-8 text-center backdrop-blur-sm">
+      <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-muted)]/50 p-8 text-center backdrop-blur-sm">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)]">
           <Sparkles className="h-8 w-8 text-[var(--accent)]" />
         </div>

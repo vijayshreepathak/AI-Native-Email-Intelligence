@@ -16,17 +16,17 @@ export function LoadingPipeline() {
   }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--accent)]/30 bg-[var(--surface)]">
+    <div className="flex min-h-[420px] flex-col rounded-xl border border-[var(--accent)]/30 bg-[var(--surface)]">
       <div className="shrink-0 border-b border-[var(--border)] px-4 py-3">
         <p className="text-sm font-semibold text-[var(--accent)]">AI Pipeline Running</p>
         <p className="text-xs text-[var(--text-muted)]">LangGraph executing nodes in sequence…</p>
       </div>
-      <div className="min-h-0 flex-1 p-4">
+      <div className="p-4">
         <PipelineVisualization
           loading
           autoScroll
           activeNode={PIPELINE_ORDER[activeIdx]}
-          className="h-full max-h-none"
+          className="max-h-[min(520px,60vh)]"
         />
       </div>
     </div>

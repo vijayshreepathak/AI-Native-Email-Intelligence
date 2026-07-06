@@ -83,7 +83,7 @@ export function EvaluateForm({ onResult, onLoading, onRegisterRegenerate }: Prop
     "w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/25";
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+    <div className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-4 py-2.5">
         <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--accent)]">
           <Sparkles className="h-4 w-4" />
@@ -118,7 +118,7 @@ export function EvaluateForm({ onResult, onLoading, onRegisterRegenerate }: Prop
           </div>
         }
       >
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-4">
           <SampleTickets
             onSelect={(t) => {
               setSubject(t.subject);
@@ -156,12 +156,12 @@ export function EvaluateForm({ onResult, onLoading, onRegisterRegenerate }: Prop
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex flex-col">
             <label className="mb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
               Customer email
             </label>
             <textarea
-              className={`${inputCls} panel-scroll min-h-[120px] flex-1 resize-none leading-relaxed`}
+              className={`${inputCls} min-h-[160px] resize-y leading-relaxed`}
               placeholder="Paste the customer support email here…"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -171,12 +171,12 @@ export function EvaluateForm({ onResult, onLoading, onRegisterRegenerate }: Prop
           </div>
 
           {mode === "evaluate" && (
-            <div className="flex min-h-0 shrink-0 flex-col" style={{ minHeight: "140px", maxHeight: "40%" }}>
+            <div className="flex flex-col">
               <label className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
                 Expected reference reply <span className="text-[var(--success)]">(min 10 chars)</span>
               </label>
               <textarea
-                className={`${inputCls} panel-scroll min-h-[120px] flex-1 resize-none leading-relaxed`}
+                className={`${inputCls} min-h-[140px] resize-y leading-relaxed`}
                 placeholder="Paste the ideal agent reply for comparison…"
                 value={expected}
                 onChange={(e) => setExpected(e.target.value)}

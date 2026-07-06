@@ -27,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full dark`} suppressHydrationWarning>
-      <body className="h-full antialiased" suppressHydrationWarning>
+      <body className="h-full overflow-hidden antialiased" suppressHydrationWarning>
         <ClerkProvider>
           <ApiAuthSetup>
             <ThemeProvider>{children}</ThemeProvider>

@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [showScrollFab, setShowScrollFab] = useState(true);
   const analyticsRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const regenerateRef = useRef<(() => void) | null>(null);
   const registerRegenerate = useCallback((fn: () => void) => {
@@ -57,11 +58,12 @@ export default function DashboardPage() {
   }, [refresh]);
 
   useEffect(() => {
+    const root = scrollRef.current;
     const el = analyticsRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => setShowScrollFab(!entry.isIntersecting),
-      { threshold: 0.15 }
+      { root: root ?? undefined, threshold: 0.15 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -79,8 +81,8 @@ export default function DashboardPage() {
   }, [scrollToAnalytics]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <div className="sticky top-0 z-40 bg-[var(--bg)]/95 shadow-[var(--shadow)] backdrop-blur-md">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[var(--bg)]">
+      <div className="z-40 shrink-0 bg-[var(--bg)]/95 shadow-[var(--shadow)] backdrop-blur-md">
         <Header health={health} onRefresh={refresh} refreshing={refreshing} onScrollToAnalytics={scrollToAnalytics} />
 
         {apiError && (
@@ -93,34 +95,35 @@ export default function DashboardPage() {
         <PremiumMetrics metrics={metrics} result={result} />
       </div>
 
-      <main className="grid min-h-[calc(100vh-12rem)] grid-cols-1 gap-3 p-3 lg:grid-cols-12">
-        <div className="min-h-[420px] lg:col-span-5 lg:min-h-0">
-          <EvaluateForm
-            onLoading={setPipelineLoading}
-            onRegisterRegenerate={registerRegenerate}
-            onResult={(r, mode) => {
-              setResult(r);
-              setResultMode(mode);
-              setPipelineLoading(false);
-              refresh();
-            }}
-          />
-        </div>
-        <div className="min-h-[480px] lg:col-span-7 lg:min-h-0">
-          <ReplyViewer
-            result={result}
-            mode={resultMode}
-            loading={pipelineLoading}
-            onRegenerate={() => regenerateRef.current?.()}
-          />
-        </div>
-      </main>
+      <div ref={scrollRef} className="main-scroll min-h-0 flex-1">
+        <main className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-12 lg:items-start">
+          <div className="lg:col-span-5">
+            <EvaluateForm
+              onLoading={setPipelineLoading}
+              onRegisterRegenerate={registerRegenerate}
+              onResult={(r, mode) => {
+                setResult(r);
+                setResultMode(mode);
+                setPipelineLoading(false);
+                refresh();
+              }}
+            />
+          </div>
+          <div className="lg:col-span-7">
+            <ReplyViewer
+              result={result}
+              mode={resultMode}
+              loading={pipelineLoading}
+              onRegenerate={() => regenerateRef.current?.()}
+            />
+          </div>
+        </main>
 
-      <section
-        id="analytics"
-        ref={analyticsRef}
-        className="scroll-mt-36 border-t-2 border-[var(--accent)]/30 bg-[var(--surface-muted)]/80 px-3 py-6 pb-12 backdrop-blur-sm"
-      >
+        <section
+          id="analytics"
+          ref={analyticsRef}
+          className="scroll-mt-4 border-t-2 border-[var(--accent)]/30 bg-[var(--surface-muted)]/80 px-3 py-6 pb-16 backdrop-blur-sm"
+        >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BarChart2 className="h-5 w-5 text-[var(--accent)]" />
@@ -141,7 +144,8 @@ export default function DashboardPage() {
         >
           <AnalyticsDashboard metrics={metrics} />
         </ClientOnly>
-      </section>
+        </section>
+      </div>
 
       {showScrollFab && !pipelineLoading && (
         <ClientOnly>

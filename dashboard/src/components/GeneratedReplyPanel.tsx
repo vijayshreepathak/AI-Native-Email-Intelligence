@@ -108,7 +108,7 @@ export function GeneratedReplyPanel({ reply, citations = [], confidence, onRegen
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-col">
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {confidence != null && <ConfidenceBadge score={confidence} label="Confidence" />}
         <ToolbarBtn icon={Copy} label={copied ? "Copied" : "Copy"} onClick={copy} />
@@ -125,7 +125,7 @@ export function GeneratedReplyPanel({ reply, citations = [], confidence, onRegen
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="panel-scroll min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--border)] bg-black/30 p-5"
+            className="rounded-xl border border-[var(--border)] bg-black/30 p-5"
           >
             <div className="prose-reply space-y-3 text-sm leading-relaxed">
               {parts.map((p, i) => (
