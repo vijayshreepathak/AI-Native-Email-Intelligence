@@ -354,6 +354,62 @@ pytest tests/ -v
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence transformer |
 | `RETRIEVAL_TOP_K` | `3` | Documents retrieved per query |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed frontend origins |
+| `CORS_ORIGIN_REGEX` | `https://.*\.vercel\.app` | Regex for Vercel preview/production URLs |
+
+---
+
+## Deployment
+
+### Backend → [Render](https://render.com)
+
+The repo includes a [Render Blueprint](https://render.com/docs/blueprint-spec) (`render.yaml`).
+
+1. Push the repo to [GitHub](https://github.com/vijayshreepathak/AI-Native-Email-Intelligence)
+2. In Render: **New → Blueprint** → connect the repo
+3. Set secret env vars in the Render dashboard:
+   - `ANTHROPIC_API_KEY` (optional if using Gemini only)
+   - `GEMINI_API_KEY`
+   - `CORS_ORIGINS` → your Vercel URL, e.g. `https://ai-native-email-intelligence.vercel.app`
+4. Deploy — build runs `requirements-prod.txt` + embeds knowledge into ChromaDB
+5. Copy the Render URL, e.g. `https://ai-email-intelligence-api.onrender.com`
+
+**Render settings (manual deploy):**
+
+| Setting | Value |
+|---------|--------|
+| Root Directory | *(repo root)* |
+| Build Command | `chmod +x build.sh && ./build.sh` |
+| Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Health Check | `/health` |
+| Plan | **Starter** recommended (512MB+, longer request timeout) |
+
+> Generate/Evaluate requests take **30–120 seconds**. Free Render tiers may timeout — use **Starter** plan or higher.
+
+---
+
+### Frontend → [Vercel](https://vercel.com)
+
+1. Import the GitHub repo in Vercel
+2. Set **Root Directory** to `dashboard`
+3. Add environment variable:
+
+```env
+NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com
+```
+
+4. Deploy — Vercel auto-detects Next.js via `dashboard/vercel.json`
+
+**After deploy:** update Render `CORS_ORIGINS` with your exact Vercel production URL (preview deploys are covered by `CORS_ORIGIN_REGEX`).
+
+---
+
+### Verify production
+
+```bash
+curl https://your-api.onrender.com/health
+# Open https://your-app.vercel.app → Sync → Generate Reply
+```
 
 ---
 

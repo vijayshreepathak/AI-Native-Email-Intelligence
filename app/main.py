@@ -24,6 +24,7 @@ from app.schemas import (
 )
 from app.services.dashboard import DashboardService, get_dashboard_service
 from app.state import EmailState
+from app.utils.helpers import load_json
 from app.utils.logger import setup_logging, get_logger
 
 logger = get_logger(__name__)
@@ -53,9 +54,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_settings.cors_origin_list(),
+    allow_origin_regex=_settings.cors_origin_regex or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -227,3 +230,18 @@ async def dashboard(
     """Get aggregated dashboard metrics."""
     metrics = dashboard_svc.save_dashboard()
     return DashboardResponse(metrics=metrics.model_dump(mode="json"))
+
+
+@app.get("/evaluations")
+async def list_evaluations() -> dict[str, Any]:
+    """Return evaluation history for analytics (used by Vercel dashboard)."""
+    settings = get_settings()
+    path = settings.evaluation_results_path
+    if not path.exists():
+        return {"evaluations": []}
+    try:
+        data = load_json(path)
+        return {"evaluations": data if isinstance(data, list) else []}
+    except Exception as exc:
+        logger.warning("Could not load evaluations: %s", exc)
+        return {"evaluations": []}

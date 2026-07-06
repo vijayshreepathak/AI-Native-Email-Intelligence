@@ -57,6 +57,17 @@ class Settings(BaseSettings):
     generated_results_path: Path = Field(default=RESULTS_DIR / "generated.json")
     evaluation_results_path: Path = Field(default=RESULTS_DIR / "evaluation.json")
     dashboard_path: Path = Field(default=RESULTS_DIR / "dashboard.json")
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        alias="CORS_ORIGINS",
+    )
+    cors_origin_regex: str = Field(
+        default=r"https://.*\.vercel\.app",
+        alias="CORS_ORIGIN_REGEX",
+    )
+
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def project_root(self) -> Path:
