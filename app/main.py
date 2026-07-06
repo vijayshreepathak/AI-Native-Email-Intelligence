@@ -14,9 +14,6 @@ from . import __version__
 from .auth.clerk import get_current_user_id
 from .config import get_settings
 from .db.database import init_db
-from .graph import get_full_graph, get_generate_graph, get_predict_graph
-from .llm.gateway import get_llm_gateway
-from .retriever.vector_store import get_vector_store
 from .schemas import (
     DashboardResponse,
     EmailInput,
@@ -27,46 +24,43 @@ from .schemas import (
     PredictResponse,
 )
 from .services.dashboard import get_dashboard_service
-from .startup_validation import log_env_diagnostics, validate_production_env
+from .startup_validation import validate_production_env
 from .state import EmailState
 from .utils.logger import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
 
+def _get_graph(module_attr: str):
+    """Lazy-import LangGraph compiled graphs — avoids evaluation imports at startup."""
+    import app.graph as graph_module
+
+    return getattr(graph_module, module_attr)()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Startup runs after imports succeed; env validation and heavy init happen here."""
+    """Lightweight startup: settings, logging, DB, routes only — no Chroma/embeddings."""
     setup_logging()
-    logger.info("Starting AI Email Intelligence Platform v%s", __version__)
 
-    log_env_diagnostics()
     try:
         validate_production_env()
-        logger.info("Environment validation passed")
     except RuntimeError as exc:
         logger.error("Environment validation failed: %s", exc)
 
-    settings = get_settings()
-    if not settings.has_llm_provider:
-        logger.warning("No LLM API key configured — generation endpoints will fail")
-
     try:
-        init_db()
+        if init_db():
+            logger.info("✓ Database connected")
+        else:
+            logger.info("✓ Database skipped (DATABASE_URL not set)")
     except Exception as exc:
         logger.warning("Database init skipped: %s", exc)
 
-    try:
-        vector_store = get_vector_store()
-        if vector_store.document_count == 0:
-            logger.info("Vector store empty, ingesting knowledge policies...")
-            count = vector_store.ingest_policies()
-            logger.info("Ingested %d documents", count)
-    except Exception as exc:
-        logger.warning("ChromaDB init/ingest skipped: %s", exc)
+    logger.info("✓ FastAPI started")
+    logger.info("✓ Routes registered")
+    logger.info("✓ Environment OK")
 
     yield
-    logger.info("Shutting down AI Email Intelligence Platform")
 
 
 app = FastAPI(
@@ -117,30 +111,28 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/health")
-async def health_check() -> dict[str, Any]:
-    """Health check with LLM gateway status (Render-safe — no external calls)."""
+async def health_check() -> dict[str, str]:
+    """Render health probe — <100ms, no Chroma / LLM / evaluation."""
+    return {"status": "healthy", "version": __version__}
+
+
+@app.get("/status")
+async def status_check() -> dict[str, Any]:
+    """Optional diagnostics for dashboard Sync — lazy-checks vector store only."""
     settings = get_settings()
-    gateway = get_llm_gateway()
-    stats = gateway.stats
+    from .services.vector_manager import get_vector_manager
 
-    chroma_available = False
-    try:
-        chroma_available = get_vector_store().document_count > 0
-    except Exception:
-        pass
-
+    vector = get_vector_manager().status()
     return {
         "status": "healthy",
         "version": __version__,
-        "model": stats.current_model or settings.llm_model,
-        "chroma_available": chroma_available,
-        "llm_provider": stats.current_provider or settings.llm_provider,
-        "fallback_available": settings.fallback_available,
+        "model": settings.llm_model,
+        "llm_provider": settings.llm_provider,
         "fallback_provider": settings.fallback_provider,
-        "fallback_used": stats.fallback_used,
-        "retries": stats.total_retries,
-        "provider_latency_ms": stats.last_latency_ms,
+        "fallback_available": settings.fallback_available,
         "providers": settings.providers_configured(),
+        "chroma_available": vector["vector_store_ready"],
+        "vector_store": vector,
     }
 
 
@@ -153,7 +145,7 @@ async def predict(
     _ = user_id
     start = time.perf_counter()
     state = _build_state(request.subject, request.email)
-    graph = get_predict_graph()
+    graph = _get_graph("get_predict_graph")
 
     try:
         result = await graph.ainvoke(state)
@@ -179,7 +171,7 @@ async def generate(
     """Generate a validated support reply."""
     dashboard = get_dashboard_service(user_id)
     state = _build_state(request.subject, request.email, request.customer_name, request.company)
-    graph = get_generate_graph()
+    graph = _get_graph("get_generate_graph")
 
     try:
         result = await graph.ainvoke(state)
@@ -226,7 +218,7 @@ async def evaluate(
         request.company,
         request.expected_response,
     )
-    graph = get_full_graph()
+    graph = _get_graph("get_full_graph")
 
     try:
         result = await graph.ainvoke(state)

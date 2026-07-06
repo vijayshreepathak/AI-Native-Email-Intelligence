@@ -1,8 +1,5 @@
 """Evaluation pipeline nodes for LangGraph."""
 
-from .bertscore import compute_bertscore
-from .embedding_similarity import compute_embedding_similarity
-from .overall_score import aggregate_feedback, compute_overall_score
 from ..state import EmailState
 from ..utils.helpers import merge_node_metrics
 from ..utils.logger import get_logger, log_node_execution
@@ -12,6 +9,8 @@ logger = get_logger(__name__)
 
 async def embedding_evaluation_node(state: EmailState) -> dict:
     """Compute embedding cosine similarity."""
+    from .embedding_similarity import compute_embedding_similarity
+
     generated = state.get("generated_reply", {})
     reply = generated.get("reply", "")
     expected = state.get("expected_response", "")
@@ -27,6 +26,8 @@ async def embedding_evaluation_node(state: EmailState) -> dict:
 
 async def bertscore_node(state: EmailState) -> dict:
     """Compute BERTScore metrics."""
+    from .bertscore import compute_bertscore
+
     generated = state.get("generated_reply", {})
     reply = generated.get("reply", "")
     expected = state.get("expected_response", "")
@@ -42,6 +43,8 @@ async def bertscore_node(state: EmailState) -> dict:
 
 async def final_report_node(state: EmailState) -> dict:
     """Compute overall score and aggregate feedback."""
+    from .overall_score import aggregate_feedback, compute_overall_score
+
     with log_node_execution(logger, "final_report", "") as metrics:
         overall = compute_overall_score(
             state.get("bertscore", {}),

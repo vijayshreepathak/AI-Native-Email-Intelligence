@@ -79,8 +79,16 @@ class KnowledgeRetriever:
 
         vector_results = self._vector_store.query(search_query, top_k=self._top_k)
 
-        if not vector_results and self._vector_store.document_count == 0:
-            logger.warning("Vector store empty, using graph-only retrieval")
+        if not vector_results and (
+            not self._vector_store.is_ready or self._vector_store.document_count == 0
+        ):
+            if not self._vector_store.is_ready:
+                logger.warning(
+                    "Vector store not initialized — using graph-only retrieval. "
+                    "Run: python scripts/build_vector_store.py"
+                )
+            else:
+                logger.warning("Vector store empty, using graph-only retrieval")
             vector_results = self._fallback_from_graph(graph_context)
 
         logger.info(

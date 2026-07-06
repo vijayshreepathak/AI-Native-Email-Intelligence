@@ -406,11 +406,32 @@ CLERK_SECRET_KEY=sk_test_...
 
 See [Environment Variables](#environment-variables) for production vars (Neon, Clerk JWT on Render, CORS).
 
-#### 3. Index knowledge base
+#### 3. Build vector store (offline — required once)
+
+Embeddings are **never** generated during server startup. Build locally or in CI, then commit the result:
 
 ```bash
-python scripts/embed_knowledge.py embed
+python scripts/build_vector_store.py
+# Optional: python scripts/build_vector_store.py --clear
+# Verify only: python scripts/build_vector_store.py --verify-only
 ```
+
+Output goes to `knowledge/vectorstore/` — **commit this folder** so Render opens a prebuilt index without downloading ONNX or re-embedding.
+
+**First-time setup (venv must have dependencies installed):**
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+pip install -r requirements.txt # required — fixes "No module named pydantic"
+python scripts/build_vector_store.py
+```
+
+> **Windows:** ChromaDB (`chroma-hnswlib`) often **cannot compile** on Windows without full Visual Studio C++ tools. If `pip install -r requirements.txt` fails on `chroma-hnswlib`, use either:
+> - **GitHub Actions:** repo → Actions → **Build Vector Store** → Run workflow → download `knowledge-vectorstore` artifact → extract to `knowledge/vectorstore/`
+> - **Linux / cloud shell:** same `pip install` + `python scripts/build_vector_store.py` (works on Render/Ubuntu)
+
+> Same embedding model (`all-MiniLM-L6-v2` via Chroma ONNX) — identical retrieval quality, zero startup cost.
 
 #### 4. Start backend (Terminal 1)
 
@@ -543,20 +564,16 @@ ai-email-intelligence/
 ├── app/                     # FastAPI + LangGraph backend
 │   ├── agents/              # Pipeline agent nodes (call LLMGateway only)
 │   ├── llm/                 # Provider-agnostic LLM gateway
-│   │   ├── gateway.py       # Retries, caching, failover
-│   │   ├── factory.py       # LLMFactory.create(provider)
-│   │   └── providers/       # gemini, groq, openai, anthropic
-│   ├── retriever/           # ChromaDB + knowledge graph
-│   ├── evaluation/          # BERTScore, embeddings, judge
-│   ├── services/            # Dashboard aggregation
+│   ├── retriever/           # Knowledge graph + lazy vector queries
+│   ├── evaluation/          # BERTScore, embeddings (lazy import)
+│   ├── services/            # Dashboard + VectorManager (lazy Chroma)
 │   └── main.py              # API entry point
+├── knowledge/
+│   ├── policies/ faq/ templates/ knowledge_graph.json
+│   └── vectorstore/         # Prebuilt Chroma index (commit after build)
 ├── dashboard/               # Next.js AI Operations UI
-│   └── src/
-│       ├── app/             # Pages + API routes
-│       └── components/      # Pipeline viz, metrics, analytics, etc.
-├── knowledge/               # Graph, policies, FAQs, templates, ChromaDB
 ├── dataset/                 # train / validation / test JSON
-├── scripts/                 # embed_knowledge, generate_dataset, test_llm_fallback
+├── scripts/                 # build_vector_store, generate_dataset, etc.
 ├── results/                 # generated.json, evaluation.json, dashboard.json
 ├── Screenshots/             # UI screenshots for README
 ├── cli.py                   # Typer CLI (local dev — production uses start.sh)
@@ -660,12 +677,39 @@ Identical prompts are cached by **SHA256** hash (`CACHE_TTL_SECONDS`, default 36
 
 ### Dashboard & health
 
-`GET /health` and `GET /dashboard` expose:
+- `GET /health` — Render probe (<100ms, no Chroma/LLM)
+- `GET /status` — provider config + vector store status (dashboard Sync)
+- `GET /dashboard` — aggregated metrics
 
-- Current provider / model
-- Fallback provider and whether fallback was used
-- Retry count and last provider latency
-- Cache hits
+---
+
+## Production Startup Architecture (Render Free 512MB)
+
+### Build phase vs runtime
+
+| Phase | When | What runs |
+|-------|------|-----------|
+| **Build** | Local / CI | `python scripts/build_vector_store.py` — embed policies/FAQs → `knowledge/vectorstore/` |
+| **Runtime** | Render boot | Settings → logging → DB → FastAPI (no Chroma, no ONNX, no ingest) |
+| **First RAG** | `/generate` | Lazy-open prebuilt index → query embed only → retrieve → LLM |
+
+### Before vs after startup
+
+| Stage | Before (OOM) | After |
+|-------|--------------|-------|
+| Startup time | 2–5s + ingest | ~0.5–1s |
+| Chroma + ONNX at boot | Yes | **No** |
+| Auto `ingest_policies()` | Yes | **Removed** |
+| `/health` | Loaded Chroma | **<100ms**, version only |
+| Startup RAM | 600–900MB+ | **~120–200MB** |
+| First `/generate` peak | N/A | **~350–450MB** |
+
+```bash
+# Build once locally, commit, deploy
+python scripts/build_vector_store.py
+git add knowledge/vectorstore/
+git push origin main
+```
 
 ---
 

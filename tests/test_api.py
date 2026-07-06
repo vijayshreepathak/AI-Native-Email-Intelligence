@@ -19,7 +19,7 @@ def test_health_endpoint(client):
     data = response.json()
     assert data["status"] == "healthy"
     assert "version" in data
-    assert "model" in data
+    assert "model" not in data
 
 
 def test_dashboard_endpoint(client):
@@ -29,7 +29,7 @@ def test_dashboard_endpoint(client):
     assert "metrics" in data
 
 
-@patch("app.main.get_predict_graph")
+@patch("app.main._get_graph")
 def test_predict_endpoint(mock_graph_fn, client):
     mock_graph = AsyncMock()
     mock_graph.ainvoke = AsyncMock(

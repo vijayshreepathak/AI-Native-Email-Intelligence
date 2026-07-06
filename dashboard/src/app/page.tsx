@@ -41,8 +41,8 @@ export default function DashboardPage() {
     setRefreshing(true);
     setApiError(null);
     try {
-      const [h, d] = await Promise.all([api.health(), api.dashboard()]);
-      setHealth(h);
+      const [h, s, d] = await Promise.all([api.health(), api.status(), api.dashboard()]);
+      setHealth({ ...s, status: h.status, version: h.version });
       setMetrics(d.metrics);
     } catch {
       setApiError("Backend offline — run: python cli.py serve");

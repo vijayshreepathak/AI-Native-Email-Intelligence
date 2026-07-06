@@ -1,5 +1,7 @@
 """TTL-based in-memory cache for expensive operations."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import time

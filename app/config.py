@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     embedding_model: str = Field(default="all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")
     chroma_persist_dir: Path = Field(
-        default=EMBEDDINGS_DIR / "chroma",
+        default=KNOWLEDGE_DIR / "vectorstore",
         alias="CHROMA_PERSIST_DIR",
     )
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(

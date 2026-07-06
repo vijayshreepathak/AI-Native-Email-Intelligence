@@ -29,6 +29,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () =>
+    request<{ status: string; version: string }>("/health"),
+  status: () =>
     request<{
       status: string;
       version: string;
@@ -37,11 +39,9 @@ export const api = {
       llm_provider?: string;
       fallback_available?: boolean;
       fallback_provider?: string;
-      fallback_used?: boolean;
-      retries?: number;
-      provider_latency_ms?: number;
       providers?: Record<string, boolean>;
-    }>("/health"),
+      vector_store?: { warning?: string };
+    }>("/status"),
   dashboard: () => request<{ metrics: import("./types").DashboardMetrics }>("/dashboard"),
   generate: (body: { subject: string; email: string; customer_name?: string; company?: string }) =>
     request<import("./types").GenerateResult>("/generate", { method: "POST", body: JSON.stringify(body) }),

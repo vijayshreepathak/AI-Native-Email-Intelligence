@@ -12,11 +12,6 @@ from .agents.knowledge_agent import knowledge_agent
 from .agents.priority_agent import priority_agent
 from .agents.sentiment_agent import sentiment_agent
 from .agents.validator_agent import validator_agent
-from .evaluation.pipeline import (
-    bertscore_node,
-    embedding_evaluation_node,
-    final_report_node,
-)
 from .state import EmailState
 from .utils.logger import get_logger
 
@@ -46,6 +41,12 @@ def build_email_graph(include_evaluation: bool = True) -> Any:
     graph.add_edge("generator_agent", "validator_agent")
 
     if include_evaluation:
+        from .evaluation.pipeline import (
+            bertscore_node,
+            embedding_evaluation_node,
+            final_report_node,
+        )
+
         graph.add_node("embedding_evaluation", embedding_evaluation_node)
         graph.add_node("bertscore", bertscore_node)
         graph.add_node("judge_agent", judge_agent)
@@ -86,7 +87,7 @@ _generate_graph: Any = None
 
 
 def get_full_graph() -> Any:
-    """Full pipeline with evaluation."""
+    """Full pipeline with evaluation — evaluation deps imported lazily inside build."""
     global _compiled_graph
     if _compiled_graph is None:
         _compiled_graph = build_email_graph(include_evaluation=True)
