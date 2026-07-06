@@ -415,4 +415,4 @@ curl https://your-api.onrender.com/health
 
 ## License
 
-MIT — built for the Hiver AI Copilot Challenge.
+MIT
