@@ -153,22 +153,21 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for full production setup (Render + Vercel 
 
 Requires **Python 3.12+** (`runtime.txt` pins 3.12.8 for Render).
 
+```bash
+pip install -r requirements.txt          # production / Render
+pip install -r requirements-dev.txt      # + CLI, pytest (local)
+pip install -r requirements-evaluation.txt  # + torch, BERTScore (local full eval)
+```
+
 #### 1. Clone & install
 
 ```bash
 git clone https://github.com/vijayshreepathak/AI-Native-Email-Intelligence.git
 cd AI-Native-Email-Intelligence
 
-# Python backend
 python -m venv .venv
 .venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # macOS/Linux
-pip install -r requirements.txt
-
-# Frontend dashboard
-cd dashboard
-npm install
-cd ..
+pip install -r requirements-dev.txt   # includes production deps + CLI + pytest
 ```
 
 #### 2. Configure environment
@@ -439,7 +438,7 @@ curl https://your-api.onrender.com/health
 ```
 
 ```bash
-python scripts/check_environment.py
+python scripts/check_runtime.py
 ```
 
 ---

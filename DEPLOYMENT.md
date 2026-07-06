@@ -138,7 +138,8 @@ Requires **Python 3.12+** (see `runtime.txt`).
 ```bash
 python -m venv .venv
 .venv\Scripts\activate          # Windows
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+pip install -r requirements-evaluation.txt   # optional: full BERTScore eval
 cp .env.example .env            # add API keys
 python scripts/embed_knowledge.py embed
 uvicorn app.main:app --reload --port 8000
@@ -158,7 +159,7 @@ Optional local auth/database: set `DATABASE_URL` and Clerk vars in `.env` / `.en
 ### Verify environment
 
 ```bash
-python scripts/check_environment.py
+python scripts/check_runtime.py
 ```
 
 ---

@@ -54,9 +54,21 @@ def compute_bertscore(
         return _fallback_similarity(candidate, reference)
 
 
-def _fallback_similarity(candidate: str, reference: str) -> dict[str, float]:
-    """Fallback using RapidFuzz when BERTScore unavailable."""
-    from rapidfuzz import fuzz
+def _token_overlap_ratio(candidate: str, reference: str) -> float:
+    """Pure-Python fallback when evaluation packages are not installed."""
+    cand_tokens = set(candidate.lower().split())
+    ref_tokens = set(reference.lower().split())
+    if not cand_tokens or not ref_tokens:
+        return 0.0
+    return len(cand_tokens & ref_tokens) / len(cand_tokens | ref_tokens)
 
-    ratio = fuzz.token_sort_ratio(candidate, reference) / 100.0
+
+def _fallback_similarity(candidate: str, reference: str) -> dict[str, float]:
+    """Fallback when BERTScore / RapidFuzz unavailable."""
+    try:
+        from rapidfuzz import fuzz
+
+        ratio = fuzz.token_sort_ratio(candidate, reference) / 100.0
+    except ImportError:
+        ratio = _token_overlap_ratio(candidate, reference)
     return {"precision": ratio, "recall": ratio, "f1": ratio}

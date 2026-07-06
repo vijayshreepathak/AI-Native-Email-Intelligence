@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-"""Verify Python environment, dependencies, and optional runtime resources."""
+# Full environment check (includes optional evaluation packages if installed)
+# For Render/production validation use scripts/check_runtime.py instead.
 
 from __future__ import annotations
 
@@ -26,36 +26,26 @@ def main() -> int:
     py_ok = sys.version_info >= (3, 12)
     all_ok &= check("Python >= 3.12", py_ok, sys.version.split()[0])
 
-    packages = [
-        "fastapi",
-        "uvicorn",
-        "langgraph",
-        "langchain_core",
-        "langchain_anthropic",
-        "anthropic",
-        "chromadb",
-        "sentence_transformers",
-        "torch",
-        "numpy",
-        "bert_score",
-        "rapidfuzz",
-        "httpx",
-        "pydantic",
-        "pydantic_settings",
-        "sqlalchemy",
-        "psycopg2",
-        "jwt",
-        "typer",
-        "rich",
-        "orjson",
+    runtime_packages = [
+        "fastapi", "uvicorn", "langgraph", "langchain_core", "anthropic",
+        "chromadb", "numpy", "sqlalchemy", "psycopg2", "jwt",
     ]
-    print("\n--- Installed packages ---")
-    for pkg in packages:
+    print("\n--- Runtime packages ---")
+    for pkg in runtime_packages:
         try:
             importlib.import_module(pkg)
             all_ok &= check(pkg, True)
         except ImportError as exc:
             all_ok &= check(pkg, False, str(exc))
+
+    excluded = ["torch", "bert_score", "sentence_transformers"]
+    print("\n--- Evaluation packages (optional) ---")
+    for pkg in excluded:
+        try:
+            importlib.import_module(pkg)
+            check(pkg, True, "installed via requirements-evaluation.txt")
+        except ImportError:
+            check(pkg, False, "not installed — evaluation uses fallbacks")
 
     print("\n--- Application import ---")
     try:

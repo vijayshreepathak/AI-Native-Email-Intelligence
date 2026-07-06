@@ -1,5 +1,5 @@
-# Production + dev — Python 3.12, CPU PyTorch for Render
---extra-index-url https://download.pytorch.org/whl/cpu
+# Production runtime — Python 3.12 (Render)
+# No PyTorch / evaluation deps — those live in requirements-evaluation.txt
 
 # Web API
 fastapi==0.115.12
@@ -17,15 +17,9 @@ langchain-core==0.3.59
 langchain-anthropic==0.3.12
 anthropic==0.49.0
 
-# Retrieval & embeddings
+# Retrieval (ChromaDB DefaultEmbeddingFunction — ONNX, no torch)
 chromadb==0.6.3
-sentence-transformers==3.4.1
 numpy==2.2.4
-
-# Evaluation
-bert-score==0.3.13
-rapidfuzz==3.12.2
-torch==2.6.0+cpu
 
 # Database (Neon PostgreSQL)
 sqlalchemy==2.0.40
@@ -33,11 +27,3 @@ psycopg2-binary==2.9.10
 
 # Auth (Clerk JWT verification)
 PyJWT[crypto]==2.10.1
-
-# CLI / build scripts
-typer==0.15.2
-rich==14.0.0
-
-# Dev / tests
-pytest==8.3.5
-pytest-asyncio==0.25.3

@@ -1,71 +1,80 @@
-# Deployment Report
-
-Generated after production-readiness pass for Render deployment.
+# Render Deployment Report — Dependency Optimization
 
 ## Checklist
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Dependency Audit | ✓ | Single `requirements.txt`; `requirements-prod.txt` removed |
-| Imports Fixed | ✓ | Absolute imports under `app.*`; `app/db`, `app/auth` packages added |
-| Package Structure Verified | ✓ | `__init__.py` in `app/`, `agents/`, `db/`, `auth/`, `evaluation/`, `retriever/`, `services/`, `utils/` |
-| FastAPI Starts | ✓ | `app = FastAPI()` in `app/main.py` |
-| Uvicorn Starts | ✓ | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-| Render Ready | ✓ | `render.yaml`, `build.sh`, `runtime.txt`, `.python-version` |
-| Python Version | ✓ | 3.12.8 (`runtime.txt`), local dev requires 3.12+ |
-| Missing Environment Variables | ⚠ | Set on Render: `DATABASE_URL`, `CLERK_*`, `GEMINI_API_KEY`, `CORS_ORIGINS` |
-| Health Endpoint | ✓ | `GET /health` returns status, version, providers |
-| Chroma | ✓ | Graceful fallback; auto-ingest on startup; embed in build.sh |
-| LangGraph | ✓ | `langgraph==0.3.34` in requirements.txt |
-| Anthropic | ✓ | Optional; graceful warning if missing |
-| Per-User History | ✓ | Neon PostgreSQL + Clerk JWT when `DATABASE_URL` set |
-| Clerk Auth (Frontend) | ✓ | `@clerk/nextjs`, middleware, ClerkProvider, Bearer token in API client |
+| Item | Status |
+|------|--------|
+| requirements optimized | ✓ |
+| PyTorch download removed | ✓ |
+| SSL issue eliminated | ✓ |
+| Render compatible | ✓ |
+| FastAPI startup (no torch) | ✓ |
+| No unnecessary packages in prod | ✓ |
 
-## Key Changes
+## Production vs Optional Dependencies
 
-1. **Unified dependencies** — one `requirements.txt` with pinned versions including `langgraph`, CPU `torch`, SQLAlchemy, psycopg2, PyJWT.
-2. **Graceful startup** — missing LLM keys, Chroma, or knowledge files log warnings; app still starts.
-3. **Health endpoint** — includes `providers.anthropic`, `providers.gemini`, `providers.chromadb`, `providers.postgresql`.
-4. **Per-user isolation** — `EvaluationRecord` / `GenerationRecord` keyed by Clerk `user_id` in Neon.
-5. **Clerk integration** — dashboard middleware protects routes; API sends Bearer token; backend verifies JWT via JWKS.
-6. **Documentation** — `DEPLOYMENT.md`, `scripts/check_environment.py`, README + How to Use updated for live URL.
+| File | Purpose | Installed on Render |
+|------|---------|---------------------|
+| `requirements.txt` | API runtime (FastAPI, LangGraph, ChromaDB, DB, Clerk) | **Yes** |
+| `requirements-dev.txt` | CLI, scripts, pytest | No |
+| `requirements-evaluation.txt` | torch, bert-score, sentence-transformers, rapidfuzz | No |
 
-## Environment Variables to Configure
+## Removed from Production
 
-### Render (backend)
+| Package | Reason |
+|---------|--------|
+| `--extra-index-url download.pytorch.org` | Caused SSLV3_ALERT_HANDSHAKE_FAILURE on Render |
+| `torch==2.6.0+cpu` | ~700MB; only needed for evaluation embeddings/BERTScore |
+| `sentence-transformers` | Evaluation-only; ChromaDB uses built-in ONNX embeddings |
+| `bert-score` | Evaluation-only; lazy-loaded with token-overlap fallback |
+| `rapidfuzz` | Evaluation-only; optional BERTScore fallback |
+| `typer`, `rich` | Dev/CLI scripts only |
+| `pytest`, `pytest-asyncio` | Tests only |
 
-```env
-DATABASE_URL=postgresql://...          # Neon — SET IN RENDER DASHBOARD ONLY
-GEMINI_API_KEY=...
-CLERK_SECRET_KEY=sk_...
-CLERK_ISSUER=https://xxx.clerk.accounts.dev
-CLERK_JWKS_URL=https://xxx.clerk.accounts.dev/.well-known/jwks.json
-CORS_ORIGINS=https://ainativeemail.vercel.app
-```
+## Kept in Production
 
-### Vercel (frontend)
+| Package | Reason |
+|---------|--------|
+| `chromadb` | RAG vector store (ONNX DefaultEmbeddingFunction) |
+| `numpy` | Lightweight cosine/hash embeddings for evaluation fallback |
+| `langgraph`, `langchain-*`, `anthropic` | Core pipeline |
+| `sqlalchemy`, `psycopg2-binary`, `PyJWT` | Neon + Clerk |
 
-```env
-NEXT_PUBLIC_API_URL=https://your-service.onrender.com
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
-CLERK_SECRET_KEY=sk_...
-```
+## Graceful Degradation (no code path changes)
 
-## Validation Commands
+- **Generate / Predict** — never import torch or bert-score
+- **Evaluate** — BERTScore lazy-loads; falls back to token overlap if `bert-score` absent
+- **Embedding similarity** — lazy-loads SentenceTransformer; falls back to hash embeddings if absent
+- **ChromaDB retrieval** — uses Chroma built-in ONNX model (no torch)
+
+## Build Command (Render)
 
 ```bash
 pip install -r requirements.txt
-python scripts/check_environment.py
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-curl http://127.0.0.1:8000/health
 ```
+
+No contact with `download.pytorch.org`.
+
+## Verification
 
 ```bash
-cd dashboard && npm install && npm run build
+pip install -r requirements.txt
+python scripts/check_runtime.py
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-## Known Limitations
+Full evaluation locally:
 
-- Local default Python 3.9 will fail `pip install` — use Python 3.12+ (matches Render).
-- Render free tier cold starts can exceed 30s; first API call may timeout.
-- Claude credits exhausted in dev — Gemini fallback active when `GEMINI_API_KEY` is set.
+```bash
+pip install -r requirements-evaluation.txt
+```
+
+## Estimated Impact
+
+| Metric | Before | After | Reduction |
+|--------|--------|-------|-----------|
+| Download size | ~2.0–2.5 GB | ~400–600 MB | **~70–80%** |
+| Install time (Render) | ~8–15 min | ~2–4 min | **~60–75%** |
+| PyTorch.org fetches | 1+ (SSL failure) | **0** | **100%** |
+
+*Estimates based on torch+transformers+bert-score removal; ChromaDB + LangChain remain the largest prod deps.*
