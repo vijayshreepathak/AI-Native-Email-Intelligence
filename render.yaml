@@ -4,9 +4,8 @@ services:
     name: ai-native-email-intelligence
     env: python
     plan: free
-    buildCommand: chmod +x build.sh && ./build.sh
-    preDeployCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: chmod +x build.sh start.sh && ./build.sh
+    startCommand: bash start.sh
     healthCheckPath: /health
     autoDeploy: true
     envVars:

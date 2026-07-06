@@ -34,8 +34,9 @@ The frontend never connects to Neon directly. Set `DATABASE_URL` only on **Rende
 |---------|--------|
 | Environment | Python |
 | Root Directory | *(repo root)* |
-| Build Command | `chmod +x build.sh && ./build.sh` |
-| Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Build Command | `chmod +x build.sh start.sh && ./build.sh` |
+| Pre-Deploy Command | *(leave blank)* |
+| Start Command | `bash start.sh` |
 | Health Check Path | `/health` |
 
 ### Render environment variables
@@ -169,7 +170,8 @@ python scripts/check_runtime.py
 | Issue | Fix |
 |-------|-----|
 | `ModuleNotFoundError: langgraph` | Use Python 3.12+, run `pip install -r requirements.txt` |
-| Render exits immediately | Check logs; ensure `uvicorn app.main:app` start command |
+| Render exits immediately | **Start Command must be `bash start.sh`** — NOT `pip install -r requirements-prod.txt` |
+| `requirements-prod.txt` not found | Fixed via alias file; Pre-Deploy can use it, but Start Command must be `bash start.sh` |
 | 401 on generate/evaluate | Sign in via Clerk; ensure backend has Clerk JWKS vars |
 | CORS errors | Set `CORS_ORIGINS` on Render to your Vercel URL |
 | Cold start timeout | Render free tier sleeps; first request may take 30–60s |

@@ -402,7 +402,7 @@ The repo includes a [Render Blueprint](https://render.com/docs/blueprint-spec) (
 |---------|--------|
 | Root Directory | *(repo root)* |
 | Build Command | `chmod +x build.sh && ./build.sh` |
-| Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Start Command | `bash start.sh` |
 | Health Check | `/health` |
 | Python Version | 3.12.8 (`runtime.txt`) |
 
