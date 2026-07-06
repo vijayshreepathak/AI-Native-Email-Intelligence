@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ApiAuthSetup } from "@/components/ApiAuthSetup";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
@@ -26,7 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full dark`} suppressHydrationWarning>
       <body className="h-full antialiased" suppressHydrationWarning>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ClerkProvider>
+          <ApiAuthSetup>
+            <ThemeProvider>{children}</ThemeProvider>
+          </ApiAuthSetup>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -77,10 +77,11 @@ class HealthResponse(BaseModel):
 
     status: str
     version: str
-    model: str
-    chroma_available: bool
-    llm_provider: str = "claude"
+    model: str = ""
+    chroma_available: bool = False
+    llm_provider: str = "none"
     fallback_available: bool = False
+    providers: dict[str, bool] = Field(default_factory=dict)
 
 
 class DashboardResponse(BaseModel):

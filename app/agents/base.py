@@ -48,7 +48,7 @@ class LLMClient:
         self._gemini_model = settings.gemini_model
         self._max_retries = settings.max_retries
         self._anthropic_key = settings.anthropic_api_key.strip()
-        self._gemini_key = settings.gemini_api_key.strip()
+        self._gemini_key = settings.effective_gemini_key.strip()
         self._provider = "claude" if self._anthropic_key else "gemini"
         self._model = self._anthropic_model if self._anthropic_key else self._gemini_model
         self._llm: ChatAnthropic | None = None

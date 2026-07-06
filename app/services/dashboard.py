@@ -1,10 +1,13 @@
-"""Dashboard metrics aggregation service."""
+"""Dashboard metrics aggregation service with per-user PostgreSQL isolation."""
 
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
 from app.config import get_settings
+from app.db.database import database_enabled, get_session
+from app.db.models import EvaluationRecord, GenerationRecord
+from sqlalchemy import select
 from app.models import DashboardMetrics
 from app.utils.helpers import load_json, save_json
 from app.utils.logger import get_logger
@@ -15,13 +18,27 @@ logger = get_logger(__name__)
 class DashboardService:
     """Aggregates evaluation results into dashboard metrics."""
 
-    def __init__(self) -> None:
+    def __init__(self, user_id: str = "local-dev") -> None:
         settings = get_settings()
+        self._user_id = user_id
         self._evaluation_path = settings.evaluation_results_path
         self._dashboard_path = settings.dashboard_path
         self._generated_path = settings.generated_results_path
 
     def _load_evaluations(self) -> list[dict[str, Any]]:
+        if database_enabled():
+            try:
+                with get_session() as session:
+                    rows = session.scalars(
+                        select(EvaluationRecord)
+                        .where(EvaluationRecord.user_id == self._user_id)
+                        .order_by(EvaluationRecord.created_at.desc())
+                    ).all()
+                    return [row.data for row in rows]
+            except Exception as exc:
+                logger.error("DB load evaluations failed: %s", exc)
+                return []
+
         if not self._evaluation_path.exists():
             return []
         data = load_json(self._evaluation_path)
@@ -48,9 +65,7 @@ class DashboardService:
             intent_scores[intent].append(overall)
 
             node_metrics = eval_item.get("node_metrics", {})
-            total_latency = sum(
-                m.get("latency_ms", 0) for m in node_metrics.values()
-            )
+            total_latency = sum(m.get("latency_ms", 0) for m in node_metrics.values())
             latencies.append(total_latency)
 
             gen_reply = eval_item.get("generated_reply", {})
@@ -61,42 +76,25 @@ class DashboardService:
             hallucination_flags.append(hallucination_score < 0.7)
 
             for criterion in [
-                "correctness",
-                "completeness",
-                "empathy",
-                "professionalism",
-                "actionability",
-                "safety",
-                "hallucination",
-                "policy_adherence",
+                "correctness", "completeness", "empathy", "professionalism",
+                "actionability", "safety", "hallucination", "policy_adherence",
             ]:
                 if criterion in judge:
                     judge_scores[criterion].append(judge[criterion])
 
-        intent_averages = {
-            intent: sum(vals) / len(vals)
-            for intent, vals in intent_scores.items()
-        }
+        intent_averages = {intent: sum(vals) / len(vals) for intent, vals in intent_scores.items()}
         sorted_intents = sorted(intent_averages.items(), key=lambda x: x[1], reverse=True)
 
-        judge_distribution = {
-            k: round(sum(v) / len(v), 4) for k, v in judge_scores.items()
-        }
+        judge_distribution = {k: round(sum(v) / len(v), 4) for k, v in judge_scores.items()}
 
         return DashboardMetrics(
             average_score=round(sum(scores) / len(scores), 4) if scores else 0.0,
             average_latency_ms=round(sum(latencies) / len(latencies), 2) if latencies else 0.0,
             average_tokens=round(sum(tokens) / len(tokens), 1) if tokens else 0.0,
             total_processed=len(evaluations),
-            top_intents=[
-                {"intent": k, "avg_score": round(v, 4)} for k, v in sorted_intents[:5]
-            ],
-            worst_intents=[
-                {"intent": k, "avg_score": round(v, 4)} for k, v in sorted_intents[-5:]
-            ],
-            hallucination_rate=round(
-                sum(hallucination_flags) / len(hallucination_flags), 4
-            )
+            top_intents=[{"intent": k, "avg_score": round(v, 4)} for k, v in sorted_intents[:5]],
+            worst_intents=[{"intent": k, "avg_score": round(v, 4)} for k, v in sorted_intents[-5:]],
+            hallucination_rate=round(sum(hallucination_flags) / len(hallucination_flags), 4)
             if hallucination_flags
             else 0.0,
             judge_distribution=judge_distribution,
@@ -104,21 +102,38 @@ class DashboardService:
         )
 
     def save_dashboard(self) -> DashboardMetrics:
-        """Compute and persist dashboard metrics."""
+        """Compute metrics (persist to file only in local-dev mode)."""
         metrics = self.compute_metrics()
-        save_json(self._dashboard_path, metrics.model_dump(mode="json"))
-        logger.info("Dashboard saved with %d evaluations", metrics.total_processed)
+        if not database_enabled():
+            save_json(self._dashboard_path, metrics.model_dump(mode="json"))
+        logger.info("Dashboard computed for user=%s with %d evaluations", self._user_id, metrics.total_processed)
         return metrics
 
     def append_evaluation(self, result: dict[str, Any]) -> None:
-        """Append evaluation result and update dashboard."""
+        """Append evaluation result scoped to user."""
+        if database_enabled():
+            try:
+                with get_session() as session:
+                    session.add(EvaluationRecord(user_id=self._user_id, data=result))
+                return
+            except Exception as exc:
+                logger.error("DB append evaluation failed: %s", exc)
+
         evaluations = self._load_evaluations()
         evaluations.append(result)
         save_json(self._evaluation_path, evaluations)
         self.save_dashboard()
 
     def append_generation(self, result: dict[str, Any]) -> None:
-        """Append generation result."""
+        """Append generation result scoped to user."""
+        if database_enabled():
+            try:
+                with get_session() as session:
+                    session.add(GenerationRecord(user_id=self._user_id, data=result))
+                return
+            except Exception as exc:
+                logger.error("DB append generation failed: %s", exc)
+
         if self._generated_path.exists():
             data = load_json(self._generated_path)
             if not isinstance(data, list):
@@ -128,13 +143,11 @@ class DashboardService:
         data.append(result)
         save_json(self._generated_path, data)
 
+    def list_evaluations(self) -> list[dict[str, Any]]:
+        """Public accessor for user-scoped evaluation history."""
+        return self._load_evaluations()
 
-_dashboard_service: DashboardService | None = None
 
-
-def get_dashboard_service() -> DashboardService:
-    """Singleton dashboard service."""
-    global _dashboard_service
-    if _dashboard_service is None:
-        _dashboard_service = DashboardService()
-    return _dashboard_service
+def get_dashboard_service(user_id: str = "local-dev") -> DashboardService:
+    """Factory for user-scoped dashboard service."""
+    return DashboardService(user_id=user_id)

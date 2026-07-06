@@ -4,6 +4,7 @@
 
 Production-quality AI email reply platform inspired by **Hiver AI Copilot**. It ingests customer support emails, runs a multi-agent LangGraph pipeline, retrieves company knowledge, generates validated replies, and scores quality with BERTScore, embeddings, and an LLM judge — all exposed through a FastAPI backend and a polished Next.js AI Operations dashboard.
 
+**Live app:** [https://ainativeemail.vercel.app/](https://ainativeemail.vercel.app/)  
 **Repository:** [github.com/vijayshreepathak/AI-Native-Email-Intelligence](https://github.com/vijayshreepathak/AI-Native-Email-Intelligence)
 
 ---
@@ -12,7 +13,7 @@ Production-quality AI email reply platform inspired by **Hiver AI Copilot**. It 
 
 ```mermaid
 flowchart TB
-    subgraph UI["Next.js Dashboard — localhost:3000"]
+    subgraph UI["Next.js Dashboard — ainativeemail.vercel.app"]
         PG[Copilot Playground]
         PM[Premium Metrics]
         PV[Pipeline Visualization]
@@ -137,7 +138,22 @@ Historical quality trends, grounding scores, latency charts, and intent distribu
 
 ## Quick Start
 
-### 1. Clone & install
+### Use the live app
+
+1. Open **[https://ainativeemail.vercel.app/](https://ainativeemail.vercel.app/)**
+2. **Sign in** with Clerk (top-right) — your history is private to your account
+3. Pick a sample ticket → **Generate Reply** or switch to **Evaluate**
+4. Click **Sync** if metrics show dashes (Render free tier may need a moment to wake)
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for full production setup (Render + Vercel + Neon + Clerk).
+
+---
+
+### Local development
+
+Requires **Python 3.12+** (`runtime.txt` pins 3.12.8 for Render).
+
+#### 1. Clone & install
 
 ```bash
 git clone https://github.com/vijayshreepathak/AI-Native-Email-Intelligence.git
@@ -155,7 +171,7 @@ npm install
 cd ..
 ```
 
-### 2. Configure environment
+#### 2. Configure environment
 
 ```bash
 cp .env.example .env
@@ -172,21 +188,21 @@ GEMINI_MODEL=gemini-2.5-flash
 
 > **Tip:** If Claude credits expire, the pipeline automatically falls back to Gemini. You only need `GEMINI_API_KEY` set.
 
-### 3. Index knowledge base
+#### 3. Index knowledge base
 
 ```bash
 python scripts/embed_knowledge.py embed
 ```
 
-### 4. Start backend (Terminal 1)
+#### 4. Start backend (Terminal 1)
 
 ```bash
-python cli.py serve
+uvicorn app.main:app --reload --port 8000
 # API → http://127.0.0.1:8000
 # Docs → http://127.0.0.1:8000/docs
 ```
 
-### 5. Start dashboard (Terminal 2)
+#### 5. Start dashboard (Terminal 2)
 
 ```bash
 cd dashboard
@@ -194,7 +210,7 @@ npm run dev
 # UI → http://localhost:3000
 ```
 
-### 6. Try it
+#### 6. Try it
 
 1. Open **http://localhost:3000**
 2. Click a **Sample Ticket** (e.g. OAuth / Gmail Sync Error)
@@ -354,12 +370,18 @@ pytest tests/ -v
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence transformer |
 | `RETRIEVAL_TOP_K` | `3` | Documents retrieved per query |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
-| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed frontend origins |
+| `CORS_ORIGINS` | `http://localhost:3000,https://ainativeemail.vercel.app` | Comma-separated allowed frontend origins |
 | `CORS_ORIGIN_REGEX` | `https://.*\.vercel\.app` | Regex for Vercel preview/production URLs |
+| `DATABASE_URL` | — | Neon PostgreSQL connection string (**Render only**) |
+| `CLERK_SECRET_KEY` | — | Clerk secret key for JWT verification |
+| `CLERK_ISSUER` | — | Clerk issuer URL, e.g. `https://xxx.clerk.accounts.dev` |
+| `CLERK_JWKS_URL` | — | Clerk JWKS URL for token verification |
 
 ---
 
 ## Deployment
+
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for Render, Vercel, Neon, Clerk, Railway, Docker, and local instructions.
 
 ### Backend → [Render](https://render.com)
 
@@ -368,11 +390,12 @@ The repo includes a [Render Blueprint](https://render.com/docs/blueprint-spec) (
 1. Push the repo to [GitHub](https://github.com/vijayshreepathak/AI-Native-Email-Intelligence)
 2. In Render: **New → Blueprint** → connect the repo
 3. Set secret env vars in the Render dashboard:
-   - `ANTHROPIC_API_KEY` (optional if using Gemini only)
-   - `GEMINI_API_KEY`
-   - `CORS_ORIGINS` → your Vercel URL, e.g. `https://ai-native-email-intelligence.vercel.app`
-4. Deploy — build runs `requirements-prod.txt` + embeds knowledge into ChromaDB
-5. Copy the Render URL, e.g. `https://ai-email-intelligence-api.onrender.com`
+   - `GEMINI_API_KEY` (and/or `ANTHROPIC_API_KEY`)
+   - `DATABASE_URL` → **paste your Neon connection string here**
+   - `CLERK_SECRET_KEY`, `CLERK_ISSUER`, `CLERK_JWKS_URL`
+   - `CORS_ORIGINS` → `https://ainativeemail.vercel.app`
+4. Deploy — build runs `requirements.txt` via `build.sh` + embeds knowledge
+5. Copy the Render URL for Vercel `NEXT_PUBLIC_API_URL`
 
 **Render settings (manual deploy):**
 
@@ -382,25 +405,29 @@ The repo includes a [Render Blueprint](https://render.com/docs/blueprint-spec) (
 | Build Command | `chmod +x build.sh && ./build.sh` |
 | Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | Health Check | `/health` |
-| Plan | **Starter** recommended (512MB+, longer request timeout) |
+| Python Version | 3.12.8 (`runtime.txt`) |
 
-> Generate/Evaluate requests take **30–120 seconds**. Free Render tiers may timeout — use **Starter** plan or higher.
+> Generate/Evaluate requests take **30–120 seconds**. Free Render tiers may timeout or sleep — first request after idle can take 30–60s.
 
 ---
 
 ### Frontend → [Vercel](https://vercel.com)
 
+**Production URL:** [https://ainativeemail.vercel.app/](https://ainativeemail.vercel.app/)
+
 1. Import the GitHub repo in Vercel
 2. Set **Root Directory** to `dashboard`
-3. Add environment variable:
+3. Add environment variables:
 
 ```env
 NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
 ```
 
 4. Deploy — Vercel auto-detects Next.js via `dashboard/vercel.json`
 
-**After deploy:** update Render `CORS_ORIGINS` with your exact Vercel production URL (preview deploys are covered by `CORS_ORIGIN_REGEX`).
+**After deploy:** update Render `CORS_ORIGINS` with your exact Vercel production URL.
 
 ---
 
@@ -408,7 +435,11 @@ NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com
 
 ```bash
 curl https://your-api.onrender.com/health
-# Open https://your-app.vercel.app → Sync → Generate Reply
+# Open https://ainativeemail.vercel.app → Sign in → Sync → Generate Reply
+```
+
+```bash
+python scripts/check_environment.py
 ```
 
 ---
