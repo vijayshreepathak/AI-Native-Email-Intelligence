@@ -1,0 +1,177 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Brain,
+  Clock,
+  GitBranch,
+  Network,
+  Scale,
+  Search,
+  Sparkles,
+} from "lucide-react";
+import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
+import { ExecutionTimeline } from "@/components/ExecutionTimeline";
+import { ExplainabilityPanel } from "@/components/ExplainabilityPanel";
+import { GeneratedReplyPanel } from "@/components/GeneratedReplyPanel";
+import { KnowledgeGraphViz } from "@/components/KnowledgeGraphViz";
+import { PipelineVisualization } from "@/components/PipelineVisualization";
+import { QualityChecklist } from "@/components/QualityChecklist";
+import { RetrievalPanel } from "@/components/RetrievalPanel";
+import type { EvaluateResult, GenerateResult } from "@/lib/types";
+
+const JudgePanel = dynamic(() => import("@/components/JudgePanel").then((m) => m.JudgePanel), {
+  ssr: false,
+  loading: () => <div className="h-48 animate-pulse rounded-xl bg-[var(--surface-muted)]" />,
+});
+
+type Tab = "reply" | "pipeline" | "knowledge" | "quality" | "retrieval" | "judge" | "insights";
+
+interface Props {
+  result: EvaluateResult | GenerateResult;
+  mode: "generate" | "evaluate" | null;
+  onRegenerate?: () => void;
+}
+
+function isEvaluate(r: EvaluateResult | GenerateResult): r is EvaluateResult {
+  return "overall_score" in r && "judge_score" in r;
+}
+
+const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "reply", label: "Reply", icon: Sparkles },
+  { id: "pipeline", label: "Pipeline", icon: GitBranch },
+  { id: "knowledge", label: "Graph", icon: Network },
+  { id: "quality", label: "Quality", icon: Scale },
+  { id: "retrieval", label: "Retrieval", icon: Search },
+  { id: "judge", label: "Judge", icon: Brain },
+  { id: "insights", label: "Insights", icon: Clock },
+];
+
+export function ResultInsights({ result, mode, onRegenerate }: Props) {
+  const [tab, setTab] = useState<Tab>("reply");
+  const reply = result.generated_reply?.reply ?? "";
+  const validation = result.validated_reply?.validation;
+  const nodeMetrics = isEvaluate(result) ? result.node_metrics : undefined;
+  const overallMs = "overall_latency_ms" in result ? result.overall_latency_ms : undefined;
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+      {/* Header badges */}
+      <div className="shrink-0 border-b border-[var(--border)] bg-[var(--surface-muted)]/80 px-4 py-2.5 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {"intent" in result && (
+            <>
+              <Badge label="Intent" value={result.intent.replace(/_/g, " ")} />
+              <Badge label="Priority" value={result.priority} warn={result.priority === "critical" || result.priority === "high"} />
+              <Badge label="Sentiment" value={result.sentiment.replace(/_/g, " ")} />
+              <Badge label="Customer" value={result.customer_type} />
+            </>
+          )}
+          {result.generated_reply?.confidence != null && (
+            <ConfidenceBadge score={result.generated_reply.confidence} />
+          )}
+          {isEvaluate(result) && (
+            <Badge label="Overall" value={`${Math.round(result.overall_score * 100)}%`} highlight />
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="panel-scroll shrink-0 overflow-x-auto border-b border-[var(--border)] px-2">
+        <div className="flex min-w-max gap-0.5 py-1.5">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition ${
+                tab === id
+                  ? "bg-[var(--accent)] text-black"
+                  : "text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+              }`}
+            >
+              <Icon className="h-3 w-3" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="panel-scroll min-h-0 flex-1 p-4">
+        {tab === "reply" && (
+          <GeneratedReplyPanel
+            reply={reply}
+            citations={result.generated_reply?.citations}
+            confidence={result.generated_reply?.confidence}
+            onRegenerate={onRegenerate}
+          />
+        )}
+        {tab === "pipeline" && (
+          <PipelineVisualization
+            nodeMetrics={nodeMetrics}
+            className="max-h-[min(520px,calc(100vh-16rem))]"
+          />
+        )}
+        {tab === "knowledge" && (
+          <KnowledgeGraphViz
+            intent={"intent" in result ? result.intent : undefined}
+            retrievedDocs={"retrieved_documents" in result ? result.retrieved_documents : []}
+            activeNodes={"retrieved_documents" in result ? result.retrieved_documents.map((d) => d.node) : []}
+          />
+        )}
+        {tab === "quality" && <QualityChecklist validation={validation} />}
+        {tab === "retrieval" && (
+          <RetrievalPanel
+            result={result}
+            embeddingScore={isEvaluate(result) ? result.embedding_score?.cosine_similarity : undefined}
+          />
+        )}
+        {tab === "judge" && isEvaluate(result) && mode === "evaluate" && (
+          <JudgePanel
+            judgeScore={result.judge_score}
+            feedback={typeof result.judge_score?.feedback === "string" ? result.judge_score.feedback : result.feedback}
+          />
+        )}
+        {tab === "judge" && !(isEvaluate(result) && mode === "evaluate") && (
+          <p className="text-xs text-[var(--text-muted)]">Switch to Evaluate mode for LLM judge scores.</p>
+        )}
+        {tab === "insights" && (
+          <div className="space-y-6">
+            <ExecutionTimeline nodeMetrics={nodeMetrics} overallMs={overallMs} />
+            {isEvaluate(result) && (
+              <ExplainabilityPanel
+                overallScore={result.overall_score}
+                judgeScore={result.judge_score}
+                validation={validation}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Badge({
+  label,
+  value,
+  highlight,
+  warn,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+  warn?: boolean;
+}) {
+  let cls = "bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]";
+  if (highlight) cls = "bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/40 font-bold";
+  else if (warn) cls = "bg-red-950/30 text-red-400 border border-red-500/30";
+  return (
+    <span className={`rounded-md px-2 py-1 text-[10px] font-medium capitalize ${cls}`}>
+      {label}: {value}
+    </span>
+  );
+}
